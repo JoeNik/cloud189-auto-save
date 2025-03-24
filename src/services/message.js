@@ -1,4 +1,5 @@
 const messageManager = require('./message/MessageManager');
+const { DingtalkService } = require('./message/dingtalk');
 
 class MessageUtil {
     constructor() {
@@ -26,11 +27,21 @@ class MessageUtil {
                 spt: process.env.WXPUSHER_SPT
             }
         });
+
+        // 初始化钉钉推送
+        this.dingtalk = process.env.DINGTALK_ENABLED === 'true' ? 
+            new DingtalkService(process.env.DINGTALK_WEBHOOK, process.env.DINGTALK_SECRET) : 
+            null;
     }
 
     // 发送消息
     async sendMessage(message) {
         await messageManager.sendMessage(message);
+        
+        // 发送钉钉消息
+        if (this.dingtalk) {
+            await this.dingtalk.sendMessage(message);
+        }
     }
 }
 

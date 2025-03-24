@@ -18,13 +18,17 @@ let editFolderSelector = new FolderSelector({
     }
 });
 
-function showEditTaskModal(id, realFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, realFolderName) {
+function showEditTaskModal(id, realFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, realFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editRealFolder').value = realFolderName?realFolderName:realFolderId;
     document.getElementById('editRealFolderId').value = realFolderId;
     document.getElementById('editCurrentEpisodes').value = currentEpisodes;
     document.getElementById('editTotalEpisodes').value = totalEpisodes;
+    document.getElementById('editEpisodeThreshold').value = episodeThreshold || '';
+    document.getElementById('editEpisodeRegex').value = episodeRegex || '';
+    document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
+    document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editStatus').value = status;
     document.getElementById('shareLink').value = shareLink;
     document.getElementById('shareFolder').value = shareFolderName;
@@ -66,6 +70,10 @@ function initEditTaskForm() {
         const realFolderName = document.getElementById('editRealFolder').value;
         const currentEpisodes = document.getElementById('editCurrentEpisodes').value;
         const totalEpisodes = document.getElementById('editTotalEpisodes').value;
+        const episodeThreshold = document.getElementById('editEpisodeThreshold').value;
+        const episodeRegex = document.getElementById('editEpisodeRegex').value;
+        const whitelistKeywords = document.getElementById('editWhitelistKeywords').value;
+        const blacklistKeywords = document.getElementById('editBlacklistKeywords').value;
         const shareFolderName = document.getElementById('shareFolder').value;
         const shareFolderId = document.getElementById('shareFolderId').value;
         const status = document.getElementById('editStatus').value;
@@ -79,6 +87,10 @@ function initEditTaskForm() {
                     realFolderId,
                     currentEpisodes: parseInt(currentEpisodes),
                     totalEpisodes: parseInt(totalEpisodes),
+                    episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : null,
+                    episodeRegex: episodeRegex || null,
+                    whitelistKeywords: whitelistKeywords || null,
+                    blacklistKeywords: blacklistKeywords || null,
                     status,
                     shareFolderName,
                     shareFolderId,

@@ -152,6 +152,22 @@
                 <input type="number" id="editTotalEpisodes" min="0">
             </div>
             <div class="form-group">
+                <label for="editEpisodeThreshold">截止集数</label>
+                <input type="number" id="editEpisodeThreshold" min="0" placeholder="超过此集数的文件不会保存">
+            </div>
+            <div class="form-group">
+                <label for="editEpisodeRegex">集数提取正则</label>
+                <input type="text" id="editEpisodeRegex" placeholder="用于从文件名中提取集数的正则表达式">
+            </div>
+            <div class="form-group">
+                <label for="editWhitelistKeywords">白名单关键字</label>
+                <input type="text" id="editWhitelistKeywords" placeholder="多个关键字用英文逗号分隔，例如：1080p,2160p">
+            </div>
+            <div class="form-group">
+                <label for="editBlacklistKeywords">黑名单关键字</label>
+                <input type="text" id="editBlacklistKeywords" placeholder="多个关键字用英文逗号分隔，例如：sample,trailer">
+            </div>
+            <div class="form-group">
                 <label for="editStatus">状态</label>
                 <select id="editStatus" required>
                     <option value="pending">待处理</option>
@@ -165,5 +181,70 @@
                 <button type="button" onclick="closeEditTaskModal()">取消</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- 文件夹选择弹窗 -->
+<div id="folderSelectModal" class="modal">
+    <div class="modal-content">
+        <h2>选择需要订阅的文件夹</h2>
+        <div class="folder-list" style="max-height: 400px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="selectAllFolders" onclick="toggleSelectAllFolders()"></th>
+                        <th>文件夹名称</th>
+                    </tr>
+                </thead>
+                <tbody id="folderListBody"></tbody>
+            </table>
+        </div>
+        <div class="form-actions">
+            <button onclick="confirmFolderSelection()">确定</button>
+            <button onclick="closeFolderSelectModal()">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 通知配置弹窗 -->
+<div id="notificationConfigModal" class="modal">
+    <div class="modal-content">
+        <h2>通知配置</h2>
+        <form id="notificationConfigForm">
+            <div class="form-group">
+                <label for="dingTalkToken">钉钉 Webhook Token</label>
+                <input type="text" id="dingTalkToken" placeholder="填写钉钉机器人的 access_token">
+            </div>
+            <div class="form-group">
+                <label for="dingTalkSecret">钉钉 Secret</label>
+                <input type="text" id="dingTalkSecret" placeholder="填写钉钉机器人的 secret">
+            </div>
+            <div class="form-actions">
+                <button type="submit">保存</button>
+                <button type="button" onclick="closeNotificationConfigModal()">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 更新记录弹窗 -->
+<div id="updateLogsModal" class="modal">
+    <div class="modal-content">
+        <h2>更新记录</h2>
+        <div class="update-logs" style="max-height: 500px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>任务</th>
+                        <th>更新内容</th>
+                    </tr>
+                </thead>
+                <tbody id="updateLogsBody"></tbody>
+            </table>
+        </div>
+        <div class="form-actions">
+            <button onclick="closeUpdateLogsModal()">关闭</button>
+        </div>
     </div>
 </div>

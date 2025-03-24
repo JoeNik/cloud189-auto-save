@@ -7,6 +7,100 @@ class TaskService {
         this.accountRepo = accountRepo;
         this.taskLogRepo = taskLogRepo;
         this.messageUtil = new MessageUtil();
+        this.taskExpireDays = parseInt(process.env.TASK_EXPIRE_DAYS || '3');
+
+        // 默认的集数匹配正则表达式
+        this.defaultEpisodeRegex = [
+            /[Ss]\d+[Ee](\d+)/,    // S01E01 格式，只提取E后面的集数
+            /[Ee][Pp]?(\d+)/i,     // EP01 或 E01 格式
+            /第(\d+)[集话]/,       // 第01集 格式
+            /\.E(\d+)\./i,         // .E01. 格式
+            /[\[\(](\d+)[\]\)]/    // [01] 或 (01) 格式
+        ];
+    }
+
+    // 从文件名中提取集数
+    _getEpisodeNumber(fileName, episodeRegex) {
+        // 如果提供了自定义正则表达式
+        if (episodeRegex) {
+            try {
+                const regex = new RegExp(episodeRegex);
+                const match = fileName.match(regex);
+                if (match && match[1]) {
+                    return parseInt(match[1]);
+                }
+            } catch (error) {
+                console.error('自定义正则表达式解析失败:', error);
+            }
+        }
+
+        // 使用默认正则表达式
+        for (const regex of this.defaultEpisodeRegex) {
+            const match = fileName.match(regex);
+            if (match && match[1]) {
+                const episodeNumber = parseInt(match[1]);
+                if (!isNaN(episodeNumber)) {
+                    console.log(`[默认正则] 使用正则 ${regex} 从文件 ${fileName} 中提取到第 ${episodeNumber} 集`);
+                    return episodeNumber;
+                }
+            }
+        }
+        return null;
+    }
+
+    // 检查文件是否符合黑白名单规则
+    _checkFileNameFilters(fileName, task) {
+        // 检查白名单
+        if (task.whitelistKeywords) {
+            const whitelistKeywords = task.whitelistKeywords.split(',').map(k => k.trim());
+            if (whitelistKeywords.length > 0) {
+                const matchesWhitelist = whitelistKeywords.some(keyword => 
+                    fileName.toLowerCase().includes(keyword.toLowerCase())
+                );
+                if (!matchesWhitelist) {
+                    console.log(`[${task.resourceName}] 文件 ${fileName} 不在白名单中，跳过`);
+                    return false;
+                }
+            }
+        }
+
+        // 检查黑名单
+        if (task.blacklistKeywords) {
+            const blacklistKeywords = task.blacklistKeywords.split(',').map(k => k.trim());
+            if (blacklistKeywords.length > 0) {
+                const matchesBlacklist = blacklistKeywords.some(keyword => 
+                    fileName.toLowerCase().includes(keyword.toLowerCase())
+                );
+                if (matchesBlacklist) {
+                    console.log(`[${task.resourceName}] 文件 ${fileName} 在黑名单中，跳过`);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // 检查文件是否需要转存
+    _shouldSaveFile(fileName, task) {
+        // 首先检查黑白名单
+        if (!this._checkFileNameFilters(fileName, task)) {
+            return false;
+        }
+
+        if (!task.episodeThreshold) {
+            console.log(`[${task.resourceName}] 文件 ${fileName} 无截止集数配置，默认保存`);
+            return true;
+        }
+
+        const episodeNumber = this._getEpisodeNumber(fileName, task.episodeRegex);
+        if (episodeNumber === null) {
+            console.log(`[${task.resourceName}] 文件 ${fileName} 无法解析集数，默认保存`);
+            return true;
+        }
+
+        console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，截止集数为 ${task.episodeThreshold}，${episodeNumber >= task.episodeThreshold ? '需要' : '不需要'}保存`);
+        return episodeNumber >= task.episodeThreshold;
     }
 
     // 解析分享码
@@ -220,9 +314,19 @@ class TaskService {
                         .map(file => file.md5)
                 );
             const newFiles = shareFiles
-                .filter(file => !file.isFolder && !existingFiles.has(file.md5));
+                .filter(file => !file.isFolder && !existingFiles.has(file.md5))
+                .filter(file => this._shouldSaveFile(file.name, task));
 
             if (newFiles.length > 0) {
+                // 找到最大的集数
+                let maxEpisode = task.episodeThreshold || 0;
+                for (const file of newFiles) {
+                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex);
+                    if (episodeNumber !== null && episodeNumber > maxEpisode) {
+                        maxEpisode = episodeNumber;
+                    }
+                }
+
                 const taskInfoList = [];
                 const fileNameList = [];
                 for (const file of newFiles) {
@@ -251,18 +355,28 @@ class TaskService {
                 if (fileNameList.length > 20) {
                     fileNameList.splice(5, fileNameList.length - 10, '> <font color="warning">...</font>');
                 }
+
+                // 更新截止集数
+                if (maxEpisode > task.episodeThreshold) {
+                    const oldThreshold = task.episodeThreshold;
+                    task.episodeThreshold = maxEpisode;
+                    console.log(`[${task.resourceName}] 更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`);
+                    saveResults.push(`${resourceName}更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`);
+                }
+
                 saveResults.push(`${resourceName}更新${taskInfoList.length}集: \n ${fileNameList.join('\n')}`);
                 task.status = 'processing';
                 task.lastFileUpdateTime = new Date();
                 task.currentEpisodes = existingFiles.size + newFiles.length;
                 this.autoRename(cloud189, task)
             } else if (task.lastFileUpdateTime) {
-                // 检查是否超过3天没有新文件
+                // 检查是否超过指定天数没有新文件
                 const now = new Date();
                 const lastUpdate = new Date(task.lastFileUpdateTime);
                 const daysDiff = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
-                if (daysDiff >= 3) {
+                if (daysDiff >= this.taskExpireDays) {
                     task.status = 'completed';
+                    console.log(`[${task.resourceName}] ${this.taskExpireDays}天内没有新文件，标记为已完结`);
                 }
                 console.log(`====== ${task.resourceName} 没有增量剧集 =======`)
             }
@@ -310,7 +424,11 @@ class TaskService {
         if (!task) throw new Error('任务不存在');
 
         // 只允许更新特定字段
-        const allowedFields = ['resourceName', 'realFolderId', 'currentEpisodes', 'totalEpisodes', 'status', 'shareFolderName', 'shareFolderId'];
+        const allowedFields = [
+            'resourceName', 'realFolderId', 'currentEpisodes', 'totalEpisodes', 
+            'status', 'shareFolderName', 'shareFolderId', 'realFolderName', 
+            'episodeThreshold', 'episodeRegex', 'whitelistKeywords', 'blacklistKeywords'
+        ];
         for (const field of allowedFields) {
             if (updates[field] !== undefined) {
                 task[field] = updates[field];
@@ -330,6 +448,18 @@ class TaskService {
         if (task.totalEpisodes !== null && task.totalEpisodes < 0) {
             throw new Error('总数不能为负数');
         }
+        if (task.episodeThreshold !== null && task.episodeThreshold < 0) {
+            throw new Error('截止集数不能为负数');
+        }
+
+        // 验证黑白名单关键字格式
+        if (task.whitelistKeywords && typeof task.whitelistKeywords !== 'string') {
+            throw new Error('白名单关键字格式错误');
+        }
+        if (task.blacklistKeywords && typeof task.blacklistKeywords !== 'string') {
+            throw new Error('黑名单关键字格式错误');
+        }
+
         return await this.taskRepo.save(task);
     }
 

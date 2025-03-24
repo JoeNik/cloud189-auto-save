@@ -54,13 +54,14 @@ async function fetchTasks() {
                     <td>
                         <button class="btn-warning" onclick="deleteTask(${task.id})">删除</button>
                         <button onclick="executeTask(${task.id})">执行</button>
-                        <button onclick="showEditTaskModal(${task.id}, '${task.realFolderId || ''}', ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}','${task.shareLink}','${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.realFolderName}')">修改</button>
+                        <button onclick="showEditTaskModal(${task.id}, '${task.realFolderId || ''}', ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}','${task.shareLink}','${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.realFolderName}', ${task.episodeThreshold || 'null'}, '${task.episodeRegex || ''}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}')">修改</button>
                     </td>
                     <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName?(task.resourceName + '/' + task.shareFolderName): task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>
                     <td data-label="首次保存目录"><a href="https://cloud.189.cn/web/main/file/folder/${task.targetFolderId}" target="_blank">${task.targetFolderId}</a></td>
-                     <td data-label="更新目录"><a href="javascript:void(0)" onclick="showFileListModal('${task.id}')" class='ellipsis'>${task.realFolderName || task.realFolderId}</a></td>
+                    <td data-label="更新目录"><a href="javascript:void(0)" onclick="showFileListModal('${task.id}')" class='ellipsis'>${task.realFolderName || task.realFolderId}</a></td>
                     <td data-label="更新数/总数">${task.currentEpisodes || 0}/${task.totalEpisodes || '未知'}${progressRing}</td>
+                    <td data-label="截止集数">${task.episodeThreshold || '无限制'}</td>
                     <td data-label="状态"><span class="status-badge status-${task.status}">${task.status}</span></td>
                 </tr>
             `;
@@ -135,11 +136,16 @@ function initTaskForm() {
     
             const data = await response.json();
             if (data.success) {
-                document.getElementById('taskForm').reset();
-                const ids = data.data.map(item => item.id);
-                await Promise.all(ids.map(id => executeTask(id, false)));
-                alert('任务执行完成');
-                fetchTasks();
+                if (data.needFolderSelection) {
+                    // 显示文件夹选择弹窗
+                    showFolderSelectModal(data.folders, data.shareInfo);
+                } else {
+                    document.getElementById('taskForm').reset();
+                    const ids = Array.isArray(data.data) ? data.data.map(item => item.id) : [data.data.id];
+                    await Promise.all(ids.map(id => executeTask(id, false)));
+                    alert('任务执行完成');
+                    fetchTasks();
+                }
             } else {
                 alert('任务创建失败: ' + data.error);
             }

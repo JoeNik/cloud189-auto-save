@@ -97,6 +97,12 @@ export class Task {
     
     @Column('text', { nullable: true })
     targetRegex!: string;
+
+    @Column('integer', { nullable: true, default: 0 })
+    episodeThreshold!: number;
+
+    @Column('text', { nullable: true })
+    episodeRegex!: string;
 }
 
 export default { Account, Task };
