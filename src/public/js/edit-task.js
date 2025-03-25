@@ -13,16 +13,18 @@ let shareFolderSelector = new FolderSelector({
 
 let editFolderSelector = new FolderSelector({
     onSelect: ({ id, name }) => {
-        document.getElementById('editRealFolder').value = name;
-        document.getElementById('editRealFolderId').value = id;
+        console.log(2222,id,name);
+        document.getElementById('editTargetFolder').value = name;
+        document.getElementById('editTargetFolderId').value = id;
     }
 });
 
-function showEditTaskModal(id, realFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, realFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
+function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
-    document.getElementById('editRealFolder').value = realFolderName?realFolderName:realFolderId;
-    document.getElementById('editRealFolderId').value = realFolderId;
+    console.log(1111,targetFolderName,targetFolderId);
+    document.getElementById('editTargetFolder').value = targetFolderName?targetFolderName:targetFolderId;
+    document.getElementById('editTargetFolderId').value = targetFolderId;
     document.getElementById('editCurrentEpisodes').value = currentEpisodes;
     document.getElementById('editTotalEpisodes').value = totalEpisodes;
     document.getElementById('editEpisodeThreshold').value = episodeThreshold || '';
@@ -52,7 +54,7 @@ function initEditTaskForm() {
     });
 
     // 更新目录也改为点击触发
-    document.getElementById('editRealFolder').addEventListener('click', (e) => {
+    document.getElementById('editTargetFolder').addEventListener('click', (e) => {
         e.preventDefault();
         const accountId = document.getElementById('accountId').value;
         if (!accountId) {
@@ -66,8 +68,8 @@ function initEditTaskForm() {
         e.preventDefault();
         const id = document.getElementById('editTaskId').value;
         const resourceName = document.getElementById('editResourceName').value;
-        const realFolderId = document.getElementById('editRealFolderId').value;
-        const realFolderName = document.getElementById('editRealFolder').value;
+        const targetFolderId = document.getElementById('editTargetFolderId').value;
+        const targetFolderName = document.getElementById('editTargetFolder').value;
         const currentEpisodes = document.getElementById('editCurrentEpisodes').value;
         const totalEpisodes = document.getElementById('editTotalEpisodes').value;
         const episodeThreshold = document.getElementById('editEpisodeThreshold').value;
@@ -77,6 +79,7 @@ function initEditTaskForm() {
         const shareFolderName = document.getElementById('shareFolder').value;
         const shareFolderId = document.getElementById('shareFolderId').value;
         const status = document.getElementById('editStatus').value;
+        console.log(333,targetFolderName,shareFolderName);
 
         try {
             const response = await fetch(`/api/tasks/${id}`, {
@@ -84,7 +87,7 @@ function initEditTaskForm() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     resourceName,
-                    realFolderId,
+                    targetFolderId,
                     currentEpisodes: parseInt(currentEpisodes),
                     totalEpisodes: parseInt(totalEpisodes),
                     episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : null,
@@ -94,7 +97,7 @@ function initEditTaskForm() {
                     status,
                     shareFolderName,
                     shareFolderId,
-                    realFolderName
+                    targetFolderName
                 })
             });
 

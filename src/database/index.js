@@ -1,5 +1,5 @@
 const { DataSource } = require('typeorm');
-const { Account, Task } = require('../entities').default;
+const { Account, Task, TaskLog } = require('../entities').default;
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -10,7 +10,7 @@ const AppDataSource = new DataSource({
     database: process.env.DB_PATH || path.join(__dirname, '../../data/database.sqlite'),
     synchronize: true,
     logging: false,
-    entities: [Account, Task],
+    entities: [Account, Task, TaskLog],
     subscribers: [],
     migrations: []
 });
@@ -27,10 +27,12 @@ const initDatabase = async () => {
 
 const getAccountRepository = () => AppDataSource.getRepository(Account);
 const getTaskRepository = () => AppDataSource.getRepository(Task);
+const getTaskLogRepository = () => AppDataSource.getRepository(TaskLog);
 
 module.exports = {
     AppDataSource,
     initDatabase,
     getAccountRepository,
-    getTaskRepository
+    getTaskRepository,
+    getTaskLogRepository
 };

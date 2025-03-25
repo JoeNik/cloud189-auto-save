@@ -100,7 +100,7 @@ class TaskService {
         }
 
         console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，截止集数为 ${task.episodeThreshold}，${episodeNumber >= task.episodeThreshold ? '需要' : '不需要'}保存`);
-        return episodeNumber >= task.episodeThreshold;
+        return episodeNumber > task.episodeThreshold;
     }
 
     // 解析分享码
@@ -132,13 +132,12 @@ class TaskService {
     }
 
     // 创建任务的基础配置
-    _createTaskConfig(accountId, shareLink, targetFolderId, totalEpisodes, shareInfo, realFolder, resourceName, currentEpisodes = 0, shareFolderId = null, shareFolderName = "") {
+    _createTaskConfig(accountId, shareLink, targetFolderId, totalEpisodes, shareInfo, targetFolder, resourceName, currentEpisodes = 0, shareFolderId = null, shareFolderName = "") {
         return {
             accountId,
             shareLink,
-            targetFolderId,
-            realFolderId:realFolder.id,
-            realFolderName:realFolder.name,
+            targetFolderId: targetFolder.id,
+            targetFolderName: targetFolder.name,
             status: 'pending',
             totalEpisodes,
             resourceName,
@@ -166,14 +165,14 @@ class TaskService {
     }
 
     // 处理文件夹分享
-    async _handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks) {
+    async _handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks, selectedFolders = []) {
         const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, shareInfo.userAccessCode);
         if (!result?.fileListAO) return;
 
         const { fileList: rootFiles = [], folderList: subFolders = [] } = result.fileListAO;
         
         // 处理根目录文件
-        if (rootFiles.length > 0) {
+        if (rootFiles.length > 0 && (selectedFolders.length === 0 || selectedFolders.includes('root'))) {
             const rootTask = this.taskRepo.create(
                 this._createTaskConfig(
                     accountId, shareLink, targetFolderId, totalEpisodes,
@@ -183,15 +182,20 @@ class TaskService {
             tasks.push(await this.taskRepo.save(rootTask));
         }
 
-        // 处理子文件夹
+        // 处理子文件夹,只处理选中的文件夹
         for (const folder of subFolders) {
-            const realFolder = await cloud189.createFolder(folder.name, rootFolder.id);
-            if (!realFolder?.id) throw new Error('创建目录失败');
+            // 如果指定了selectedFolders且当前文件夹不在选中列表中,则跳过
+            if (selectedFolders.length > 0 && !selectedFolders.includes(folder.id)) {
+                continue;
+            }
+            
+            const targetFolder = await cloud189.createFolder(folder.name, rootFolder.id);
+            if (!targetFolder?.id) throw new Error('创建目录失败');
 
             const subTask = this.taskRepo.create(
                 this._createTaskConfig(
                     accountId, shareLink, targetFolderId, totalEpisodes,
-                    shareInfo, realFolder, shareInfo.fileName, 0, folder.id, folder.name
+                    shareInfo, targetFolder, shareInfo.fileName, 0, folder.id, folder.name
                 )
             );
             tasks.push(await this.taskRepo.save(subTask));
@@ -213,7 +217,12 @@ class TaskService {
     }
 
     // 创建新任务
-    async createTask(accountId, shareLink, targetFolderId, totalEpisodes = null, accessCode = null) {
+    async createTask(accountId, shareLink, targetFolderId, totalEpisodes = null, accessCode = null, selectedFolders = []) {
+        // 确保 selectedFolders 是数组
+        if (!Array.isArray(selectedFolders)) {
+            selectedFolders = [];
+        }
+
         // 获取分享信息
         const account = await this.accountRepo.findOneBy({ id: accountId });
         if (!account) throw new Error('账号不存在');
@@ -242,7 +251,7 @@ class TaskService {
         const tasks = [];
         shareInfo.userAccessCode = accessCode;
         if (shareInfo.isFolder) {
-            await this._handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks);
+            await this._handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks, selectedFolders);
         }
 
          // 处理单文件或空文件夹情况
@@ -260,15 +269,12 @@ class TaskService {
     }
 
     // 记录任务日志
-    async logTaskEvent(taskId, node, status, message = null, data = null) {
-        // const log = this.taskLogRepo.create({
-        //     taskId,
-        //     node,
-        //     status,
-        //     message,
-        //     data: data ? JSON.stringify(data) : null
-        // });
-        // await this.taskLogRepo.save(log);
+    async logTaskEvent(taskId, message) {
+        const log = this.taskLogRepo.create({
+            taskId,
+            message
+        });
+        await this.taskLogRepo.save(log);
     }
 
     // 获取文件夹下的所有文件
@@ -307,7 +313,7 @@ class TaskService {
             let shareFiles = [...shareDir.fileListAO.fileList];
             let existingFiles = new Set();
             
-            const folderFiles = await this.getAllFolderFiles(cloud189, task.realFolderId);
+            const folderFiles = await this.getAllFolderFiles(cloud189, task.targetFolderId);
             existingFiles = new Set(
                     folderFiles
                         .filter(file => !file.isFolder)
@@ -318,43 +324,40 @@ class TaskService {
                 .filter(file => this._shouldSaveFile(file.name, task));
 
             if (newFiles.length > 0) {
-                // 找到最大的集数
-                let maxEpisode = task.episodeThreshold || 0;
-                for (const file of newFiles) {
-                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex);
-                    if (episodeNumber !== null && episodeNumber > maxEpisode) {
-                        maxEpisode = episodeNumber;
-                    }
-                }
-
+                const resourceName = task.shareFolderName ? `${task.resourceName}/${task.shareFolderName}` : task.resourceName;
                 const taskInfoList = [];
                 const fileNameList = [];
+                let maxEpisode = task.episodeThreshold || 0;
+
+                // 构建任务信息列表
                 for (const file of newFiles) {
                     taskInfoList.push({
                         fileId: file.id,
                         fileName: file.name,
                         isFolder: 0
                     });
-                    fileNameList.push(` > <font color="warning">${file.name}</font>`);
-                }
-                const taskResp = await cloud189.createSaveTask(
-                    JSON.stringify(taskInfoList),
-                    task.realFolderId,
-                    task.shareId
-                );
-                if (taskResp.res_code != 0) {
-                    throw new Error(taskResp.res_msg);
+                    fileNameList.push(file.name);
+
+                    // 更新最大集数
+                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex);
+                    if (episodeNumber && episodeNumber > maxEpisode) {
+                        maxEpisode = episodeNumber;
+                    }
                 }
 
-                const status = await this.checkTaskStatus(cloud189,taskResp.taskId);
-                if (!status) {
-                    throw new Error('保存任务失败');
+                // 创建批量转存任务
+                const taskResp = await cloud189.createSaveTask(
+                    JSON.stringify(taskInfoList),
+                    task.targetFolderId,
+                    task.shareId
+                );
+
+                if (taskResp.res_code !== 0) {
+                    throw new Error(`创建转存任务失败: ${taskResp.res_message}`);
                 }
-                const resourceName = task.shareFolderName? `${task.resourceName}/${task.shareFolderName}` : task.resourceName;
-                // 防止文件数量过长, 消息推送只保留前5个和最后5个
-                if (fileNameList.length > 20) {
-                    fileNameList.splice(5, fileNameList.length - 10, '> <font color="warning">...</font>');
-                }
+
+                // 记录日志
+                await this.logTaskEvent(task.id, `${resourceName}更新${taskInfoList.length}集: \n ${fileNameList.join('\n')}`);
 
                 // 更新截止集数
                 if (maxEpisode > task.episodeThreshold) {
@@ -367,35 +370,14 @@ class TaskService {
                 saveResults.push(`${resourceName}更新${taskInfoList.length}集: \n ${fileNameList.join('\n')}`);
                 task.status = 'processing';
                 task.lastFileUpdateTime = new Date();
-                task.currentEpisodes = existingFiles.size + newFiles.length;
-                this.autoRename(cloud189, task)
-            } else if (task.lastFileUpdateTime) {
-                // 检查是否超过指定天数没有新文件
-                const now = new Date();
-                const lastUpdate = new Date(task.lastFileUpdateTime);
-                const daysDiff = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
-                if (daysDiff >= this.taskExpireDays) {
-                    task.status = 'completed';
-                    console.log(`[${task.resourceName}] ${this.taskExpireDays}天内没有新文件，标记为已完结`);
-                }
-                console.log(`====== ${task.resourceName} 没有增量剧集 =======`)
+                await this.taskRepo.save(task);
             }
-            // 检查是否达到总数
-            if (task.totalEpisodes && task.currentEpisodes >= task.totalEpisodes) {
-                task.status = 'completed';
-                console.log(`======= ${task.resourceName} 已完结 ========`)
-            }
-
-            task.lastCheckTime = new Date();
-            await this.taskRepo.save(task);
-            return saveResults.join('\n');
-
+            return saveResults.length > 0 ? saveResults.join('\n\n') : null;
         } catch (error) {
-            console.log(error)
+            console.error('处理任务失败:', error);
             task.status = 'failed';
-            task.lastError = error.message;
             await this.taskRepo.save(task);
-            return '';
+            throw error;
         }
     }
 
@@ -423,10 +405,18 @@ class TaskService {
         const task = await this.taskRepo.findOneBy({ id: taskId });
         if (!task) throw new Error('任务不存在');
 
+        // console.log('更新前的任务:', {
+        //     id: task.id,
+        //     targetFolderId: task.targetFolderId,
+        //     targetFolderName: task.targetFolderName,
+        //     shareFolderId: task.shareFolderId,
+        //     shareFolderName: task.shareFolderName
+        // });
+
         // 只允许更新特定字段
         const allowedFields = [
-            'resourceName', 'realFolderId', 'currentEpisodes', 'totalEpisodes', 
-            'status', 'shareFolderName', 'shareFolderId', 'realFolderName', 
+            'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
+            'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
             'episodeThreshold', 'episodeRegex', 'whitelistKeywords', 'blacklistKeywords'
         ];
         for (const field of allowedFields) {
@@ -434,7 +424,15 @@ class TaskService {
                 task[field] = updates[field];
             }
         }
-        
+
+        // console.log('更新后的任务:', {
+        //     id: task.id,
+        //     targetFolderId: task.targetFolderId,
+        //     targetFolderName: task.targetFolderName,
+        //     shareFolderId: task.shareFolderId,
+        //     shareFolderName: task.shareFolderName
+        // });
+
         // 验证状态值
         const validStatuses = ['pending', 'processing', 'completed', 'failed'];
         if (!validStatuses.includes(task.status)) {
@@ -466,7 +464,7 @@ class TaskService {
     // 自动重命名
     async autoRename(cloud189, task) {
         if (!task.sourceRegex || !task.targetRegex) return;
-        const folderInfo = await cloud189.listFiles(task.realFolderId);
+        const folderInfo = await cloud189.listFiles(task.targetFolderId);
         if (!folderInfo ||!folderInfo.fileListAO) return;
         const files = folderInfo.fileListAO.fileList;
         const message = []

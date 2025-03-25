@@ -54,12 +54,15 @@ async function fetchTasks() {
                     <td>
                         <button class="btn-warning" onclick="deleteTask(${task.id})">删除</button>
                         <button onclick="executeTask(${task.id})">执行</button>
-                        <button onclick="showEditTaskModal(${task.id}, '${task.realFolderId || ''}', ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}','${task.shareLink}','${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.realFolderName}', ${task.episodeThreshold || 'null'}, '${task.episodeRegex || ''}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}')">修改</button>
+                        <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
+                         ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, 
+                         '${task.status}','${task.shareLink}','${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.targetFolderName}', 
+                         ${task.episodeThreshold || 'null'}, '${task.episodeRegex || ''}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}')">修改</button>
                     </td>
                     <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName?(task.resourceName + '/' + task.shareFolderName): task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>
                     <td data-label="首次保存目录"><a href="https://cloud.189.cn/web/main/file/folder/${task.targetFolderId}" target="_blank">${task.targetFolderId}</a></td>
-                    <td data-label="更新目录"><a href="javascript:void(0)" onclick="showFileListModal('${task.id}')" class='ellipsis'>${task.realFolderName || task.realFolderId}</a></td>
+                    <td data-label="更新目录"><a href="javascript:void(0)" onclick="showFileListModal('${task.id}')" class='ellipsis'>${task.targetFolderName || task.targetFolderId}</a></td>
                     <td data-label="更新数/总数">${task.currentEpisodes || 0}/${task.totalEpisodes || '未知'}${progressRing}</td>
                     <td data-label="截止集数">${task.episodeThreshold || '无限制'}</td>
                     <td data-label="状态"><span class="status-badge status-${task.status}">${task.status}</span></td>
@@ -164,7 +167,7 @@ var chooseTask = undefined
 async function showFileListModal(taskId) {
     chooseTask = getTaskById(taskId);
     const accountId = chooseTask.accountId;
-    const folderId = chooseTask.realFolderId;
+    const folderId = chooseTask.targetFolderId;
     // 创建弹窗
     const modal = document.createElement('div');
     modal.className = 'modal files-list-modal'; 

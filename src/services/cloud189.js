@@ -242,6 +242,28 @@ class Cloud189Service {
             throw e;
         }
     }
+
+    // 保存分享文件
+    async saveShareFile(shareId, fileId, targetFolderId, shareMode) {
+        try {
+            const response = await this.client.request('https://cloud.189.cn/api/open/share/saveShare2PersonalSpace.action', {
+                method: 'POST',
+                form: {
+                    shareId,
+                    fileId,
+                    targetFolderId,
+                    shareMode
+                },
+                headers: {
+                    'Accept': 'application/json;charset=UTF-8'
+                }
+            }).json();
+            return response;
+        } catch(e) {
+            console.error('保存分享文件失败:', e);
+            throw e;
+        }
+    }
 }
 
 module.exports = { Cloud189Service };

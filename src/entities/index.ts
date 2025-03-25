@@ -32,9 +32,6 @@ export class Task {
     @Column('text')
     shareLink!: string;
 
-    @Column('text')
-    targetFolderId!: string;
-
     @Column('text', { nullable: true })
     videoType!: string;
 
@@ -60,10 +57,10 @@ export class Task {
     currentEpisodes!: number;
 
     @Column('text', { nullable: true })
-    realFolderId!: string;
+    targetFolderId!: string;
 
     @Column('text', { nullable: true })
-    realFolderName!: string;
+    targetFolderName!: string;
 
     @Column('text', { nullable: true })
     shareFileId!: string;
@@ -103,6 +100,27 @@ export class Task {
 
     @Column('text', { nullable: true })
     episodeRegex!: string;
+
+    @Column('text', { nullable: true })
+    whitelistKeywords!: string;
+
+    @Column('text', { nullable: true })
+    blacklistKeywords!: string;
 }
 
-export default { Account, Task };
+@Entity()
+export class TaskLog {
+    @PrimaryGeneratedColumn()
+    id!: number;
+
+    @Column('integer')
+    taskId!: number;
+
+    @Column('text')
+    message!: string;
+
+    @CreateDateColumn()
+    createdAt!: Date;
+}
+
+export default { Account, Task, TaskLog };

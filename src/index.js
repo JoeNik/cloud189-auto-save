@@ -28,11 +28,10 @@ AppDataSource.initialize().then(() => {
     const accountRepo = AppDataSource.getRepository(Account);
     const taskRepo = AppDataSource.getRepository(Task);
     const taskLogRepo = AppDataSource.getRepository(TaskLog);
-    const taskService = new TaskService(taskRepo, accountRepo);
+    const taskService = new TaskService(taskRepo, accountRepo, taskLogRepo);
     const messageUtil = new MessageUtil();
     // 初始化缓存管理器
     const folderCache = new CacheManager(parseInt(process.env.FOLDER_CACHE_TTL || 600));
-
 
     // 账号相关API
     app.get('/api/accounts', async (req, res) => {
@@ -143,11 +142,31 @@ AppDataSource.initialize().then(() => {
     app.put('/api/tasks/:id', async (req, res) => {
         try {
             const taskId = parseInt(req.params.id);
-            const { resourceName, realFolderId, currentEpisodes, totalEpisodes, status, shareFolderName, shareFolderId, realFolderName, episodeThreshold, episodeRegex } = req.body;
-            const updates = { resourceName, realFolderId, currentEpisodes, totalEpisodes, status, shareFolderName, shareFolderId, realFolderName, episodeThreshold, episodeRegex };
+            // console.log('收到更新请求:', {
+            //     taskId,
+            //     body: req.body
+            // });
+
+            const { 
+                resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
+                status, shareFolderName, shareFolderId, targetFolderName, 
+                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
+            } = req.body;
+            
+            const updates = { 
+                resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
+                status, shareFolderName, shareFolderId, targetFolderName, 
+                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
+            };
+
+            // console.log('准备更新的字段:', updates);
+            
             const updatedTask = await taskService.updateTask(taskId, updates);
+            // console.log('更新后的任务:', updatedTask);
+            
             res.json({ success: true, data: updatedTask });
         } catch (error) {
+            console.error('更新任务失败:', error);
             res.json({ success: false, error: error.message });
         }
     });
@@ -189,6 +208,35 @@ AppDataSource.initialize().then(() => {
             const folders = await cloud189.getFolderNodes(folderId);
             folderCache.set(cacheKey, folders);
             res.json({ success: true, data: folders });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
+    // 处理分享链接获取文件夹列表
+    app.post('/api/folders/:accountId', async (req, res) => {
+        try {
+            const accountId = parseInt(req.params.accountId);
+            const { shareLink, accessCode } = req.body;
+            
+            const account = await accountRepo.findOneBy({ id: accountId });
+            if (!account) {
+                throw new Error('账号不存在');
+            }
+
+            const cloud189 = Cloud189Service.getInstance(account);
+            const shareCode = await taskService.parseShareCode(shareLink);
+            const shareInfo = await taskService.getShareInfo(cloud189, shareCode);
+            
+            if (shareInfo.isFolder) {
+                const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, accessCode);
+                if (!result?.fileListAO?.folderList) {
+                    throw new Error('获取文件夹列表失败');
+                }
+                res.json({ success: true, data: result.fileListAO.folderList });
+            } else {
+                res.json({ success: true, data: [] });
+            }
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
         }
@@ -278,8 +326,29 @@ AppDataSource.initialize().then(() => {
     app.get('/api/config/notification', async (req, res) => {
         try {
             const config = {
-                DINGTALK_TOKEN: process.env.DINGTALK_TOKEN || '',
-                DINGTALK_SECRET: process.env.DINGTALK_SECRET || ''
+                // 钉钉配置
+                DINGTALK_ENABLED: process.env.DINGTALK_ENABLED || 'false',
+                DINGTALK_WEBHOOK: process.env.DINGTALK_WEBHOOK || '',
+                DINGTALK_SECRET: process.env.DINGTALK_SECRET || '',
+                
+                // 企业微信配置
+                WECOM_ENABLED: process.env.WECOM_ENABLED || 'false',
+                WECOM_WEBHOOK: process.env.WECOM_WEBHOOK || '',
+                
+                // Telegram配置
+                TELEGRAM_ENABLED: process.env.TELEGRAM_ENABLED || 'false',
+                TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
+                CF_PROXY_DOMAIN: process.env.CF_PROXY_DOMAIN || '',
+                PROXY_TYPE: process.env.PROXY_TYPE || '',
+                PROXY_HOST: process.env.PROXY_HOST || '',
+                PROXY_PORT: process.env.PROXY_PORT || '',
+                PROXY_USERNAME: process.env.PROXY_USERNAME || '',
+                PROXY_PASSWORD: process.env.PROXY_PASSWORD || '',
+                
+                // WxPusher配置
+                WXPUSHER_ENABLED: process.env.WXPUSHER_ENABLED || 'false',
+                WXPUSHER_SPT: process.env.WXPUSHER_SPT || ''
             };
             res.json({ success: true, data: config });
         } catch (error) {
@@ -290,19 +359,64 @@ AppDataSource.initialize().then(() => {
     // 更新通知配置
     app.post('/api/config/notification', async (req, res) => {
         try {
-            const { DINGTALK_TOKEN, DINGTALK_SECRET } = req.body;
+            const config = req.body;
             const envPath = path.resolve(process.cwd(), '.env');
             let envContent = await fs.readFile(envPath, 'utf8');
+            let envLines = envContent.split('\n');
 
-            // 更新环境变量
-            envContent = envContent.replace(/DINGTALK_TOKEN=.*\n/, `DINGTALK_TOKEN=${DINGTALK_TOKEN}\n`);
-            envContent = envContent.replace(/DINGTALK_SECRET=.*\n/, `DINGTALK_SECRET=${DINGTALK_SECRET}\n`);
+            // 更新环境变量内容
+            const updateEnvVar = (name, value) => {
+                const existingLineIndex = envLines.findIndex(line => 
+                    line.trim().startsWith(`${name}=`)
+                );
+                
+                if (existingLineIndex !== -1) {
+                    // 更新已存在的变量
+                    envLines[existingLineIndex] = `${name}=${value}`;
+                } else {
+                    // 在相同类型配置的最后一行后添加新变量
+                    const lastIndex = envLines.reduce((last, line, index) => {
+                        if (line.includes(name.split('_')[0])) {
+                            return index;
+                        }
+                        return last;
+                    }, -1);
+                    
+                    if (lastIndex !== -1) {
+                        envLines.splice(lastIndex + 1, 0, `${name}=${value}`);
+                    } else {
+                        envLines.push(`${name}=${value}`);
+                    }
+                }
+                process.env[name] = value;
+            };
 
-            await fs.writeFile(envPath, envContent);
+            // 更新钉钉配置
+            if (config.DINGTALK_ENABLED !== undefined) updateEnvVar('DINGTALK_ENABLED', config.DINGTALK_ENABLED);
+            if (config.DINGTALK_WEBHOOK !== undefined) updateEnvVar('DINGTALK_WEBHOOK', config.DINGTALK_WEBHOOK);
+            if (config.DINGTALK_SECRET !== undefined) updateEnvVar('DINGTALK_SECRET', config.DINGTALK_SECRET);
 
-            // 更新当前进程的环境变量
-            process.env.DINGTALK_TOKEN = DINGTALK_TOKEN;
-            process.env.DINGTALK_SECRET = DINGTALK_SECRET;
+            // 更新企业微信配置
+            if (config.WECOM_ENABLED !== undefined) updateEnvVar('WECOM_ENABLED', config.WECOM_ENABLED);
+            if (config.WECOM_WEBHOOK !== undefined) updateEnvVar('WECOM_WEBHOOK', config.WECOM_WEBHOOK);
+
+            // 更新Telegram配置
+            if (config.TELEGRAM_ENABLED !== undefined) updateEnvVar('TELEGRAM_ENABLED', config.TELEGRAM_ENABLED);
+            if (config.TELEGRAM_BOT_TOKEN !== undefined) updateEnvVar('TELEGRAM_BOT_TOKEN', config.TELEGRAM_BOT_TOKEN);
+            if (config.TELEGRAM_CHAT_ID !== undefined) updateEnvVar('TELEGRAM_CHAT_ID', config.TELEGRAM_CHAT_ID);
+            if (config.CF_PROXY_DOMAIN !== undefined) updateEnvVar('CF_PROXY_DOMAIN', config.CF_PROXY_DOMAIN);
+            if (config.PROXY_TYPE !== undefined) updateEnvVar('PROXY_TYPE', config.PROXY_TYPE);
+            if (config.PROXY_HOST !== undefined) updateEnvVar('PROXY_HOST', config.PROXY_HOST);
+            if (config.PROXY_PORT !== undefined) updateEnvVar('PROXY_PORT', config.PROXY_PORT);
+            if (config.PROXY_USERNAME !== undefined) updateEnvVar('PROXY_USERNAME', config.PROXY_USERNAME);
+            if (config.PROXY_PASSWORD !== undefined) updateEnvVar('PROXY_PASSWORD', config.PROXY_PASSWORD);
+
+            // 更新WxPusher配置
+            if (config.WXPUSHER_ENABLED !== undefined) updateEnvVar('WXPUSHER_ENABLED', config.WXPUSHER_ENABLED);
+            if (config.WXPUSHER_SPT !== undefined) updateEnvVar('WXPUSHER_SPT', config.WXPUSHER_SPT);
+
+            // 保存更新后的环境变量文件
+            await fs.writeFile(envPath, envLines.join('\n'));
 
             res.json({ success: true });
         } catch (error) {
@@ -311,14 +425,26 @@ AppDataSource.initialize().then(() => {
     });
 
     // 获取更新记录
-    app.get('/api/logs/updates', async (req, res) => {
+    app.get('/api/logs', async (req, res) => {
         try {
-            const logs = await taskLogRepo.find({
-                order: { timestamp: 'DESC' },
-                take: 100
+            const logs = await AppDataSource
+                .getRepository(TaskLog)
+                .createQueryBuilder('log')
+                .orderBy('log.createdAt', 'DESC')
+                .take(100)
+                .getMany();
+
+            res.json({ 
+                success: true, 
+                data: logs.map(log => ({
+                    id: log.id,
+                    taskId: log.taskId,
+                    message: log.message,
+                    createdAt: log.createdAt
+                }))
             });
-            res.json({ success: true, data: logs });
         } catch (error) {
+            console.error('获取更新记录失败:', error);
             res.status(500).json({ success: false, error: error.message });
         }
     });
