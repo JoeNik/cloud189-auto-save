@@ -90,7 +90,8 @@ AppDataSource.initialize().then(() => {
                 const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
                     shareFolderId,
                     shareFolderName,
-                    resourceName
+                    resourceName,
+                    episodeThreshold: 1000 // 设置默认截止集数
                 });
                 res.json({ success: true, data: task });
                 return;
@@ -123,7 +124,9 @@ AppDataSource.initialize().then(() => {
             }
             
             // 如果没有子文件夹，创建单个任务
-            const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode);
+            const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
+                episodeThreshold: 1000 // 设置默认截止集数
+            });
             res.json({ success: true, data: task });
         } catch (error) {
             res.json({ success: false, error: error.message });
@@ -153,11 +156,24 @@ AppDataSource.initialize().then(() => {
                 episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
             } = req.body;
             
-            const updates = { 
+            // 如果shareFolderId为"root",则获取原任务的shareFileId
+            let updates = { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
-                status, shareFolderName, shareFolderId, targetFolderName, 
+                status, shareFolderName, targetFolderName, 
                 episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
             };
+
+            if(shareFolderId === "root") {
+                // 获取原任务数据
+                const task = await taskRepo.findOneBy({ id: taskId });
+                if(!task) {
+                    throw new Error('任务不存在');
+                }
+                // 使用原任务的shareFileId
+                updates.shareFolderId = task.shareFileId;
+            } else {
+                updates.shareFolderId = shareFolderId;
+            }
 
             // console.log('准备更新的字段:', updates);
             

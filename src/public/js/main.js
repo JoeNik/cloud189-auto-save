@@ -397,6 +397,7 @@ async function handleEditTaskSubmit(e) {
         targetFolderName: document.getElementById('editTargetFolder').value || null,
         shareFolderId: document.getElementById('shareFolderId').value || null,
         shareFolderName: document.getElementById('shareFolder').value || null,
+        shareLink: document.getElementById('editShareLink').value || null,
         status: document.getElementById('editStatus').value
     };
 
@@ -414,7 +415,7 @@ async function handleEditTaskSubmit(e) {
             console.log('服务器响应:', result);
             alert('任务更新成功');
             document.getElementById('editTaskModal').style.display = 'none';
-            await loadTasks();
+            fetchTasks();
         } else {
             const error = await response.json();
             throw new Error(error.message || '更新任务失败');
@@ -486,10 +487,10 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('editStatus').value = status;
     document.getElementById('shareFolder').value = shareFolderName || '';
     document.getElementById('shareFolderId').value = shareFolderId || '';
-    document.getElementById('shareLink').value = shareLink || '';
+    document.getElementById('editShareLink').value = shareLink || '';
     document.getElementById('editTargetFolder').value = targetFolderName || '';
     document.getElementById('editTargetFolderId').value = targetFolderId || '';
-    document.getElementById('editCurrentEpisodes').value = currentEpisodes || '';
+    document.getElementById('editCurrentEpisodes').value = currentEpisodes || 0;
     
     document.getElementById('editTaskModal').style.display = 'block';
 }
@@ -543,7 +544,7 @@ async function deleteTask(taskId) {
 
         if (response.ok) {
             alert('任务删除成功');
-            await loadTasks();
+            fetchTasks();
         } else {
             throw new Error('删除任务失败');
         }
@@ -628,11 +629,10 @@ async function handleFolderSelection(shareLink, accessCode) {
     }
 }
 
-// 监听分享链接输入
+// 移除分享链接输入的自动触发
 document.getElementById('shareLink').addEventListener('input', async function() {
     const shareLink = this.value;
     if (shareLink) {
-        // 不再自动弹出选择框
         document.getElementById('folderSelection').classList.remove('hidden');
     } else {
         document.getElementById('folderSelection').classList.add('hidden');
@@ -672,7 +672,7 @@ function initEditTaskForm() {
             e.preventDefault();
             const taskId = document.getElementById('editTaskId').value;
             const accountId = document.getElementById('accountId').value;
-            const shareLink = document.getElementById('shareLink').value;
+            const shareLink = document.getElementById('editShareLink').value;
             if (!accountId) {
                 alert('请先选择账号');
                 return;
@@ -695,7 +695,7 @@ function initEditTaskForm() {
             e.preventDefault();
             const taskId = document.getElementById('editTaskId').value;
             const accountId = document.getElementById('accountId').value;
-            const shareLink = document.getElementById('shareLink').value;
+            const shareLink = document.getElementById('editShareLink').value;
             if (!accountId) {
                 alert('请先选择账号');
                 return;
@@ -725,6 +725,16 @@ function initEditTaskForm() {
             targetFolderSelector.show(accountId);
         });
     }
+
+    // 监听分享链接变化
+    const editShareLink = document.getElementById('editShareLink');
+    if (editShareLink) {
+        editShareLink.addEventListener('change', () => {
+            // 清空已选择的源目录
+            document.getElementById('shareFolder').value = '';
+            document.getElementById('shareFolderId').value = '';
+        });
+    }
 }
 
 // 分享目录选择器类
@@ -736,35 +746,35 @@ class ShareFolderSelector {
         // 创建模态框
         const modal = document.createElement('div');
         modal.id = 'shareFolderSelectorModal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
+        modal.className = 'modal';
         modal.style.display = 'none';
         modal.innerHTML = `
-            <div class="bg-white rounded-lg p-6 w-[800px] max-h-[80vh] overflow-y-auto relative shadow-xl">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-medium">选择分享目录</h3>
-                    <button type="button" class="text-gray-500 hover:text-gray-700" onclick="document.getElementById('shareFolderSelectorModal').style.display='none'">
-                        <i class="fas fa-times"></i>
-                    </button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>选择分享目录</h3>
+                    <button type="button" class="close" onclick="document.getElementById('shareFolderSelectorModal').style.display='none'">×</button>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">访问码</label>
-                    <input type="text" id="shareFolderAccessCode" class="w-full px-3 py-2 border rounded-lg" placeholder="如果需要访问码,请在此输入">
+                <div class="modal-body">
+                    <div class="form-group mb-4">
+                        <label>访问码</label>
+                        <input type="text" id="shareFolderAccessCode" class="form-control" placeholder="如果需要访问码,请在此输入">
+                    </div>
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th width="80">选择</th>
+                                    <th>目录名称</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shareFolderListBody">
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="mb-4">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">选择</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">目录名称</th>
-                            </tr>
-                        </thead>
-                        <tbody id="shareFolderListBody" class="bg-white divide-y divide-gray-200">
-                        </tbody>
-                    </table>
-                </div>
-                <div class="flex justify-end space-x-2">
-                    <button type="button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" onclick="document.getElementById('shareFolderSelectorModal').style.display='none'">取消</button>
-                    <button type="button" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" onclick="this.closest('#shareFolderSelectorModal').querySelector('.selected-folder')?.click()">确定</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('shareFolderSelectorModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary confirm-btn">确定</button>
                 </div>
             </div>
         `;
@@ -778,15 +788,8 @@ class ShareFolderSelector {
         // 添加到 body
         document.body.appendChild(modal);
 
-        // 添加全局点击事件监听
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
-
         // 添加确定按钮点击事件
-        const confirmBtn = modal.querySelector('.bg-blue-500');
+        const confirmBtn = modal.querySelector('.confirm-btn');
         confirmBtn.onclick = () => {
             if (this.selectedFolder) {
                 this.onSelect(this.selectedFolder);
@@ -825,21 +828,19 @@ class ShareFolderSelector {
 
             // 添加根目录选项
             const rootRow = document.createElement('tr');
-            rootRow.className = 'hover:bg-gray-50 cursor-pointer';
+            rootRow.className = 'folder-item';
             rootRow.innerHTML = `
-                <td class="px-6 py-4">
+                <td>
                     <input type="radio" name="shareFolder" class="form-radio" value="root">
                 </td>
-                <td class="px-6 py-4">
-                    <div class="flex items-center">
-                        <i class="fas fa-folder text-yellow-500 mr-2"></i>
-                        <span class="text-sm text-gray-700">根目录</span>
-                    </div>
+                <td>
+                    <i class="fas fa-folder text-yellow-500 mr-2"></i>
+                    根目录
                 </td>
             `;
             rootRow.addEventListener('click', () => {
-                tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('selected-folder', 'bg-blue-50'));
-                rootRow.classList.add('selected-folder', 'bg-blue-50');
+                tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('selected-folder'));
+                rootRow.classList.add('selected-folder');
                 rootRow.querySelector('input[type="radio"]').checked = true;
                 this.selectedFolder = { id: 'root', name: '根目录' };
             });
@@ -848,21 +849,19 @@ class ShareFolderSelector {
             // 添加子目录选项
             data.data.forEach(folder => {
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50 cursor-pointer';
+                row.className = 'folder-item';
                 row.innerHTML = `
-                    <td class="px-6 py-4">
+                    <td>
                         <input type="radio" name="shareFolder" class="form-radio" value="${folder.id}">
                     </td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center">
-                            <i class="fas fa-folder text-yellow-500 mr-2"></i>
-                            <span class="text-sm text-gray-700">${folder.name}</span>
-                        </div>
+                    <td>
+                        <i class="fas fa-folder text-yellow-500 mr-2"></i>
+                        ${folder.name}
                     </td>
                 `;
                 row.addEventListener('click', () => {
-                    tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('selected-folder', 'bg-blue-50'));
-                    row.classList.add('selected-folder', 'bg-blue-50');
+                    tbody.querySelectorAll('tr').forEach(tr => tr.classList.remove('selected-folder'));
+                    row.classList.add('selected-folder');
                     row.querySelector('input[type="radio"]').checked = true;
                     this.selectedFolder = folder;
                 });
@@ -874,22 +873,7 @@ class ShareFolderSelector {
             if (modal) {
                 // 重置选中状态
                 this.selectedFolder = null;
-                
-                modal.style.display = 'flex';
-                modal.style.position = 'fixed';
-                modal.style.top = '0';
-                modal.style.left = '0';
-                modal.style.right = '0';
-                modal.style.bottom = '0';
-                modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-                modal.style.zIndex = '9999';
-                
-                // 添加动画效果
-                modal.style.opacity = '0';
-                modal.style.transition = 'opacity 0.2s ease-in-out';
-                setTimeout(() => {
-                    modal.style.opacity = '1';
-                }, 10);
+                modal.style.display = 'block';
             } else {
                 throw new Error('找不到弹框元素');
             }

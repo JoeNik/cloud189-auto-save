@@ -98,8 +98,9 @@ class TaskService {
             console.log(`[${task.resourceName}] 文件 ${fileName} 无法解析集数，默认保存`);
             return true;
         }
-
-        console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，截止集数为 ${task.episodeThreshold}，${episodeNumber >= task.episodeThreshold ? '需要' : '不需要'}保存`);
+        if(episodeNumber > task.episodeThreshold) {
+            console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，截止集数为 ${task.episodeThreshold}，${episodeNumber > task.episodeThreshold ? '需要' : '不需要'}保存`);
+        }
         return episodeNumber > task.episodeThreshold;
     }
 
