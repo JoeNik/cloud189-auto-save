@@ -40,7 +40,7 @@ class TaskService {
             if (match && match[1]) {
                 const episodeNumber = parseInt(match[1]);
                 if (!isNaN(episodeNumber)) {
-                    console.log(`[默认正则] 使用正则 ${regex} 从文件 ${fileName} 中提取到第 ${episodeNumber} 集`);
+                    // console.log(`[默认正则] 使用正则 ${regex} 从文件 ${fileName} 中提取到第 ${episodeNumber} 集`);
                     return episodeNumber;
                 }
             }
@@ -304,6 +304,15 @@ class TaskService {
         return allFiles;
     }
 
+    // 格式化文件大小
+    _formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
     // 执行任务
     async processTask(task) {
         let saveResults = [];
@@ -313,21 +322,21 @@ class TaskService {
                 throw new Error('账号不存在');
             }
             const cloud189 = Cloud189Service.getInstance(account);
-             // 获取分享文件列表并进行增量转存
-             const shareDir = await cloud189.listShareDir(task.shareId, task.shareFolderId, task.shareMode,task.accessCode);
-             if (!shareDir || !shareDir.fileListAO.fileList) {
+            // 获取分享文件列表并进行增量转存
+            const shareDir = await cloud189.listShareDir(task.shareId, task.shareFolderId, task.shareMode,task.accessCode);
+            if (!shareDir || !shareDir.fileListAO.fileList) {
                 console.log("获取文件列表失败: " + JSON.stringify(shareDir))
-                 throw new Error('获取文件列表失败');
+                throw new Error('获取文件列表失败');
             }
             let shareFiles = [...shareDir.fileListAO.fileList];
             let existingFiles = new Set();
             
             const folderFiles = await this.getAllFolderFiles(cloud189, task.targetFolderId);
             existingFiles = new Set(
-                    folderFiles
-                        .filter(file => !file.isFolder)
-                        .map(file => file.md5)
-                );
+                folderFiles
+                    .filter(file => !file.isFolder)
+                    .map(file => file.md5)
+            );
             const newFiles = shareFiles
                 .filter(file => !file.isFolder && !existingFiles.has(file.md5))
                 .filter(file => this._shouldSaveFile(file.name, task));
@@ -335,8 +344,9 @@ class TaskService {
             if (newFiles.length > 0) {
                 const resourceName = task.shareFolderName ? `${task.resourceName}/${task.shareFolderName}` : task.resourceName;
                 const taskInfoList = [];
-                const fileNameList = [];
+                const fileDetailsList = [];
                 let maxEpisode = task.episodeThreshold || 0;
+                let totalSize = 0;
 
                 // 构建任务信息列表
                 for (const file of newFiles) {
@@ -345,7 +355,10 @@ class TaskService {
                         fileName: file.name,
                         isFolder: 0
                     });
-                    fileNameList.push(file.name);
+                    
+                    // 记录文件详情,包含大小信息
+                    fileDetailsList.push(`📄 ${file.name} (${this._formatFileSize(file.size)})`);
+                    totalSize += file.size;
 
                     // 更新最大集数
                     const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex);
@@ -366,17 +379,23 @@ class TaskService {
                 }
 
                 // 记录日志
-                await this.logTaskEvent(task.id, `${resourceName}更新${taskInfoList.length}集: \n ${fileNameList.join('\n')}`);
+                const logMessage = `${resourceName}更新${taskInfoList.length}个文件:\n${fileDetailsList.join('\n')}`;
+                await this.logTaskEvent(task.id, logMessage);
+
+                // 构建通知消息
+                let notificationMessage = `📢 ${resourceName}\n`;
+                notificationMessage += `✨ 更新${taskInfoList.length}个文件 (总计: ${this._formatFileSize(totalSize)})\n`;
+                notificationMessage += `\n${fileDetailsList.join('\n')}`;
 
                 // 更新截止集数
                 if (maxEpisode > task.episodeThreshold) {
                     const oldThreshold = task.episodeThreshold;
                     task.episodeThreshold = maxEpisode;
                     console.log(`[${task.resourceName}] 更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`);
-                    saveResults.push(`${resourceName}更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`);
+                    notificationMessage += `\n\n🔄 更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`;
                 }
 
-                saveResults.push(`${resourceName}更新${taskInfoList.length}集: \n ${fileNameList.join('\n')}`);
+                saveResults.push(notificationMessage);
                 task.status = 'processing';
                 task.lastFileUpdateTime = new Date();
                 await this.taskRepo.save(task);
