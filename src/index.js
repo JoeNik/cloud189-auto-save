@@ -83,17 +83,23 @@ AppDataSource.initialize().then(() => {
 
     app.post('/api/tasks', async (req, res) => {
         try {
-            const { accountId, shareLink, targetFolderId, totalEpisodes, accessCode, shareFolderId, shareFolderName, resourceName } = req.body;
+            const { accountId, shareLink, targetFolderId, totalEpisodes, accessCode, selectedFolders, resourceName } = req.body;
             
-            // 如果提供了特定的文件夹信息，直接创建任务
-            if (shareFolderId && shareFolderName) {
-                const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
-                    shareFolderId,
-                    shareFolderName,
-                    resourceName,
-                    episodeThreshold: 1000 // 设置默认截止集数
-                });
-                res.json({ success: true, data: task });
+            // 如果提供了选中的文件夹列表，为每个文件夹创建任务
+            if (selectedFolders && selectedFolders.length > 0) {
+                const tasks = [];
+                const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, selectedFolders.map(folder => folder.id));
+                // for (const folder of selectedFolders) {
+                //     // const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
+                //     //     shareFolderId: folder.id,
+                //     //     shareFolderName: folder.name,
+                //     //     resourceName: resourceName
+                //     // });
+
+                //     const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, [folder.id]);
+                //     tasks.push(task);
+                // }
+                res.json({ success: true, data: tasks });
                 return;
             }
 
@@ -124,9 +130,7 @@ AppDataSource.initialize().then(() => {
             }
             
             // 如果没有子文件夹，创建单个任务
-            const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
-                episodeThreshold: 1000 // 设置默认截止集数
-            });
+            const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode);
             res.json({ success: true, data: task });
         } catch (error) {
             res.json({ success: false, error: error.message });

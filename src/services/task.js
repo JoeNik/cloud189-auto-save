@@ -133,7 +133,7 @@ class TaskService {
     }
 
     // 创建任务的基础配置
-    _createTaskConfig(accountId, shareLink, targetFolderId, totalEpisodes, shareInfo, targetFolder, resourceName, currentEpisodes = 0, shareFolderId = null, shareFolderName = "") {
+    _createTaskConfig(accountId, shareLink, targetFolderId, totalEpisodes, shareInfo, targetFolder, resourceName, currentEpisodes = 0, shareFolderId = null, shareFolderName = "", episodeThreshold = 1000) {
         return {
             accountId,
             shareLink,
@@ -148,7 +148,8 @@ class TaskService {
             shareFolderName,
             shareId: shareInfo.shareId,
             shareMode: shareInfo.shareMode,
-            accessCode: shareInfo.userAccessCode
+            accessCode: shareInfo.userAccessCode,
+            episodeThreshold: episodeThreshold
         };
     }
 
@@ -167,8 +168,13 @@ class TaskService {
 
     // 处理文件夹分享
     async _handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks, selectedFolders = []) {
+        
         const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, shareInfo.userAccessCode);
         if (!result?.fileListAO) return;
+
+        if (totalEpisodes == null || totalEpisodes == 0) {
+            totalEpisodes = 100;
+        }
 
         const { fileList: rootFiles = [], folderList: subFolders = [] } = result.fileListAO;
         
@@ -193,10 +199,12 @@ class TaskService {
             const targetFolder = await cloud189.createFolder(folder.name, rootFolder.id);
             if (!targetFolder?.id) throw new Error('创建目录失败');
 
+            console.log("创建子目录: ", folder.name)
+
             const subTask = this.taskRepo.create(
                 this._createTaskConfig(
                     accountId, shareLink, targetFolderId, totalEpisodes,
-                    shareInfo, targetFolder, shareInfo.fileName, 0, folder.id, folder.name
+                    shareInfo, targetFolder, shareInfo.fileName, 0, folder.id, folder.name, 1000
                 )
             );
             tasks.push(await this.taskRepo.save(subTask));
@@ -218,7 +226,7 @@ class TaskService {
     }
 
     // 创建新任务
-    async createTask(accountId, shareLink, targetFolderId, totalEpisodes = null, accessCode = null, selectedFolders = []) {
+    async createTask(accountId, shareLink, targetFolderId, totalEpisodes = 100, accessCode = null, selectedFolders = []) {
         // 确保 selectedFolders 是数组
         if (!Array.isArray(selectedFolders)) {
             selectedFolders = [];
@@ -414,7 +422,7 @@ class TaskService {
         //     shareFolderName: task.shareFolderName
         // });
 
-        // 只允许更新特定字段
+        // 更新特定字段
         const allowedFields = [
             'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
             'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 

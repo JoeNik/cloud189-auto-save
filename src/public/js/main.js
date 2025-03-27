@@ -53,45 +53,42 @@ async function confirmFolderSelection() {
     const accessCode = document.getElementById('accessCode').value;
 
     try {
-        const tasks = [];
-        for (const folder of selectedFolders) {
-            const response = await fetch('/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    accountId,
-                    shareLink,
-                    totalEpisodes,
-                    targetFolderId,
-                    accessCode,
-                    shareFolderId: folder.id,
-                    shareFolderName: folder.name,
-                    resourceName: shareInfo.fileName
-                })
-            });
+        const response = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accountId,
+                shareLink,
+                totalEpisodes,
+                targetFolderId,
+                accessCode,
+                selectedFolders,
+                resourceName: shareInfo.fileName
+            })
+        });
 
-            if (!response.ok) {
-                const error = await response.json();
-                alert(`创建任务失败: ${error.error}`);
-                return;
-            }
-
-            const data = await response.json();
-            if (data.success && data.data) {
-                tasks.push(data.data);
-            }
+        if (!response.ok) {
+            const error = await response.json();
+            alert(`创建任务失败: ${error.error}`);
+            return;
         }
 
-        closeFolderSelectModal();
-        document.getElementById('taskForm').reset();
-        alert('任务创建成功');
-        
-        // 执行新创建的任务
-        for (const task of tasks) {
-            await executeTask(task.id, false);
+        const data = await response.json();
+        if (data.success) {
+            closeFolderSelectModal();
+            document.getElementById('taskForm').reset();
+            alert('任务创建成功');
+            
+            // 执行新创建的任务
+            const tasks = Array.isArray(data.data) ? data.data : [data.data];
+            for (const task of tasks) {
+                await executeTask(task.id, false);
+            }
+            
+            fetchTasks();
+        } else {
+            throw new Error(data.error || '创建任务失败');
         }
-        
-        fetchTasks();
     } catch (error) {
         alert('创建任务失败: ' + error.message);
     }
@@ -678,7 +675,7 @@ function initEditTaskForm() {
                 return;
             }
             if (!taskId) {
-                alert('任务ID不存在');
+                alert('任务ID不存在--');
                 return;
             }
             if (!shareLink) {
@@ -701,7 +698,7 @@ function initEditTaskForm() {
                 return;
             }
             if (!taskId) {
-                alert('任务ID不存在');
+                console.log('任务ID不存在');
                 return;
             }
             if (!shareLink) {
