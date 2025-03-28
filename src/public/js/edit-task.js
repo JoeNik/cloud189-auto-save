@@ -19,7 +19,7 @@ let editFolderSelector = new FolderSelector({
     }
 });
 
-function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
+function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
     console.log(1111,targetFolderName,targetFolderId);
@@ -33,6 +33,7 @@ function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, s
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editStatus').value = status;
     document.getElementById('shareLink').value = shareLink;
+    document.getElementById('editAccessCode').value = accessCode || '';
     document.getElementById('shareFolder').value = shareFolderName;
     document.getElementById('shareFolderId').value = shareFolderId;
     document.getElementById('editTaskModal').style.display = 'block';

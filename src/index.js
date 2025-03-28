@@ -89,6 +89,7 @@ AppDataSource.initialize().then(() => {
             if (selectedFolders && selectedFolders.length > 0) {
                 const tasks = [];
                 const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, selectedFolders.map(folder => folder.id));
+                tasks.push(task)
                 // for (const folder of selectedFolders) {
                 //     // const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode, {
                 //     //     shareFolderId: folder.id,

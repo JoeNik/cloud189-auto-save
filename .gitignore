@@ -114,3 +114,4 @@ dist
 /data/*
 !data/.gitkeep
 *.DS_Store
+package-lock.json

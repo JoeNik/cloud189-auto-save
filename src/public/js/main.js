@@ -395,6 +395,7 @@ async function handleEditTaskSubmit(e) {
         shareFolderId: document.getElementById('shareFolderId').value || null,
         shareFolderName: document.getElementById('shareFolder').value || null,
         shareLink: document.getElementById('editShareLink').value || null,
+        accessCode: document.getElementById('editAccessCode').value || null,
         status: document.getElementById('editStatus').value
     };
 
@@ -452,7 +453,7 @@ async function loadTasks() {
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                     <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                     ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}', 
-                    '${task.shareLink}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
+                    '${task.shareLink}', '${task.accessCode}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
                     '${task.targetFolderName || ''}', ${task.episodeThreshold || 'null'}, '${task.episodeRegex || ''}', '${task.whitelistKeywords || ''}', 
                     '${task.blacklistKeywords || ''}')" class="btn btn-secondary mr-2">
                         <i class="fas fa-edit"></i>
@@ -473,7 +474,7 @@ async function loadTasks() {
 }
 
 // 显示编辑任务模态框
-async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
+async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink,accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
@@ -485,6 +486,7 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('shareFolder').value = shareFolderName || '';
     document.getElementById('shareFolderId').value = shareFolderId || '';
     document.getElementById('editShareLink').value = shareLink || '';
+    document.getElementById('editAccessCode').value = accessCode || '';
     document.getElementById('editTargetFolder').value = targetFolderName || '';
     document.getElementById('editTargetFolderId').value = targetFolderId || '';
     document.getElementById('editCurrentEpisodes').value = currentEpisodes || 0;
@@ -670,6 +672,7 @@ function initEditTaskForm() {
             const taskId = document.getElementById('editTaskId').value;
             const accountId = document.getElementById('accountId').value;
             const shareLink = document.getElementById('editShareLink').value;
+            const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
                 alert('请先选择账号');
                 return;
@@ -682,7 +685,7 @@ function initEditTaskForm() {
                 alert('分享链接不存在');
                 return;
             }
-            await shareFolderSelector.show(taskId, accountId, shareLink);
+            await shareFolderSelector.show(taskId, accountId, shareLink, accessCode);
         });
     }
 
@@ -693,6 +696,7 @@ function initEditTaskForm() {
             const taskId = document.getElementById('editTaskId').value;
             const accountId = document.getElementById('accountId').value;
             const shareLink = document.getElementById('editShareLink').value;
+            const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
                 alert('请先选择账号');
                 return;
@@ -730,6 +734,7 @@ function initEditTaskForm() {
             // 清空已选择的源目录
             document.getElementById('shareFolder').value = '';
             document.getElementById('shareFolderId').value = '';
+            document.getElementById('shareFolderAccessCode').value = '';
         });
     }
 }
@@ -752,10 +757,10 @@ class ShareFolderSelector {
                     <button type="button" class="close" onclick="document.getElementById('shareFolderSelectorModal').style.display='none'">×</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group mb-4">
+                    <!--div class="form-group mb-4">
                         <label>访问码</label>
                         <input type="text" id="shareFolderAccessCode" class="form-control" placeholder="如果需要访问码,请在此输入">
-                    </div>
+                    </div-->
                     <div class="table-container">
                         <table class="table">
                             <thead>
@@ -797,9 +802,9 @@ class ShareFolderSelector {
         };
     }
 
-    async show(taskId, accountId, shareLink) {
+    async show(taskId, accountId, shareLink, accessCode) {
         try {
-            const accessCode = document.getElementById('shareFolderAccessCode')?.value || '';
+            // const accessCode = document.getElementById('shareFolderAccessCode')?.value || '';
             
             if (!shareLink) {
                 throw new Error('分享链接不存在');
