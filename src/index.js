@@ -493,7 +493,7 @@ AppDataSource.initialize().then(() => {
     // 启动服务器
     const port = process.env.PORT || 3000;
     app.listen(port, () => {
-        console.log(`服务器运行在 http://localhost:${port}`);
+        console.log(`服务器运行在 http://0.0.0.0:${port}`);
     });
 }).catch(error => {
     console.error('数据库连接失败:', error);

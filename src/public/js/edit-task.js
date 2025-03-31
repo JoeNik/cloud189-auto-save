@@ -22,7 +22,6 @@ let editFolderSelector = new FolderSelector({
 function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
-    console.log(1111,targetFolderName,targetFolderId);
     document.getElementById('editTargetFolder').value = targetFolderName?targetFolderName:targetFolderId;
     document.getElementById('editTargetFolderId').value = targetFolderId;
     document.getElementById('editCurrentEpisodes').value = currentEpisodes;
