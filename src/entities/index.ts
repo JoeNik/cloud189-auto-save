@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity()
-export class Account {
+class Account {
     @PrimaryGeneratedColumn()
     id!: number;
 
@@ -22,7 +22,7 @@ export class Account {
 }
 
 @Entity()
-export class Task {
+class Task {
     @PrimaryGeneratedColumn()
     id!: number;
 
@@ -109,7 +109,7 @@ export class Task {
 }
 
 @Entity()
-export class TaskLog {
+class TaskLog {
     @PrimaryGeneratedColumn()
     id!: number;
 
@@ -123,4 +123,21 @@ export class TaskLog {
     createdAt!: Date;
 }
 
-export default { Account, Task, TaskLog };
+@Entity('sessions')
+@Index(['expiredAt'])
+class Session {
+    @PrimaryGeneratedColumn('uuid')
+    id!: string;
+
+    @Column('bigint')
+    expiredAt!: number;
+
+    @Column('text', { nullable: true })
+    data!: string;
+
+    @Column('text', { nullable: true })
+    json!: string;
+}
+
+export { Account, Task, TaskLog, Session };
+export default { Account, Task, TaskLog, Session };

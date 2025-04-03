@@ -82,10 +82,10 @@ async function fetchTasks() {
 
     const data = await response.json();
     if (data.success) {
-        alert('任务删除成功');
+        toast.success('任务删除成功');
         fetchTasks();
     } else {
-        alert('任务删除失败: ' + data.error);
+        toast.error('任务删除失败: ' + data.error);
     }
 }
 
@@ -101,13 +101,13 @@ async function executeTask(id, refresh = true) {
             method: 'POST'
         });
         if (response.ok) {
-            refresh && alert('任务执行完成');
+            refresh && toast.success('任务执行完成');
             refresh && fetchTasks();
         } else {
-            alert('任务执行失败');
+            toast.error('任务执行失败');
         }
     } catch (error) {
-        alert('任务执行失败: ' + error.message);
+        toast.error('任务执行失败: ' + error.message);
     } finally {
         if (executeBtn) {
             executeBtn.classList.remove('loading');
@@ -146,14 +146,14 @@ function initTaskForm() {
                     document.getElementById('taskForm').reset();
                     const ids = Array.isArray(data.data) ? data.data.map(item => item.id) : [data.data.id];
                     await Promise.all(ids.map(id => executeTask(id, false)));
-                    alert('任务执行完成');
+                    toast.success('任务执行完成');
                     fetchTasks();
                 }
             } else {
-                alert('任务创建失败: ' + data.error);
+                toast.error('任务创建失败: ' + data.error);
             }
         } catch (error) {
-            alert('任务创建失败: ' + error.message);
+            toast.error('任务创建失败: ' + error.message);
         } finally {
             submitBtn.classList.remove('loading');
             submitBtn.disabled = false;
@@ -213,7 +213,7 @@ async function showFileListModal(taskId) {
             });
         }
     } catch (error) {
-        alert('获取文件列表失败：' + error.message);
+        toast.error('获取文件列表失败：' + error.message);
     }
 }
 // 显示批量重命名选项
@@ -222,7 +222,7 @@ function showBatchRenameOptions() {
     const targetRegex = escapeHtmlAttr(chooseTask.targetRegex)?? ''
     const selectedFiles = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.filename);
     if (selectedFiles.length === 0) {
-        alert('请选择要重命名的文件');
+        toast.error('请选择要重命名的文件');
         return;
     }
 
@@ -384,7 +384,7 @@ async function submitRename(autoUpdate) {
         destFileName: row.querySelector('td:last-child').textContent
     }));
     if (files.length == 0) {
-        alert('没有需要重命名的文件');
+        toast.error('没有需要重命名的文件');
         return
     }
     if (autoUpdate) {
@@ -405,9 +405,9 @@ async function submitRename(autoUpdate) {
         const data = await response.json();
         if (data.success) {
             if (data.data && data.data.length > 0) {
-                alert('部分文件重命名失败:'+ data.data.join(', '));
+                toast.warning('部分文件重命名失败:'+ data.data.join(', '));
             }else{
-                alert('重命名成功');
+                toast.success('重命名成功');
             }
             closeRenamePreviewModal();
             closeRenameOptionsModal();
@@ -417,10 +417,10 @@ async function submitRename(autoUpdate) {
             // 刷新文件列表
             showFileListModal(taskId);
         } else {
-            alert('重命名失败: ' + data.error);
+            toast.error('重命名失败: ' + data.error);
         }
     } catch (error) {
-        alert('重命名失败: ' + error.message);
+        toast.error('重命名失败: ' + error.message);
     }
 }
 // 辅助函数

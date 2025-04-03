@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/css/table-view.css">
     <link rel="stylesheet" href="/css/table.css">
     <link rel="stylesheet" href="/css/tabs.css">
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div class="container">
@@ -211,6 +212,61 @@
 <script src="/js/view-toggle.js"></script>
 <script src="/js/edit-task.js"></script>
 <script src="/js/main.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/folder-tree.js"></script>
+<script src="/js/notification.js"></script>
+
+<script>
+// 源目录选择器
+const shareFolderSelector = new FolderSelector({
+    onSelect: ({ id, name }) => {
+        console.log(1234,id, name);
+        document.getElementById('shareFolder').value = name;
+        document.getElementById('shareFolderId').value = id;
+    }
+});
+
+// 更新目录选择器
+const targetFolderSelector = new FolderSelector({
+    onSelect: ({ id, name }) => {
+        document.getElementById('editTargetFolder').value = name;
+        document.getElementById('editTargetFolderId').value = id;
+    }
+});
+
+// 源目录选择触发
+const shareFolder = document.getElementById('shareFolder');
+shareFolder.addEventListener('click', (e) => {
+    e.preventDefault();
+    const accountId = document.getElementById('accountId').value;
+    if (!accountId) {
+        alert('请先选择账号');
+        return;
+    }
+    shareFolderSelector.show(accountId);
+});
+
+// 更新目录选择触发
+const editTargetFolder = document.getElementById('editTargetFolder');
+editTargetFolder.addEventListener('click', (e) => {
+    e.preventDefault();
+    const accountId = document.getElementById('accountId').value;
+    if (!accountId) {
+        alert('请先选择账号');
+        return;
+    }
+    targetFolderSelector.show(accountId);
+});
+
+// 直接调用初始化函数，确保在页面加载后执行
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面加载完成，开始初始化应用...');
+    // 检查登录状态
+    checkLogin();
+    // 初始化应用
+    initializeApp();
+});
+</script>
 
 </body>
 </html>
@@ -362,46 +418,3 @@
         </div>
     </div>
 </div>
-
-<script>
-// 源目录选择器
-const shareFolderSelector = new FolderSelector({
-    onSelect: ({ id, name }) => {
-        console.log(1234,id, name);
-        document.getElementById('shareFolder').value = name;
-        document.getElementById('shareFolderId').value = id;
-    }
-});
-
-// 更新目录选择器
-const targetFolderSelector = new FolderSelector({
-    onSelect: ({ id, name }) => {
-        document.getElementById('editTargetFolder').value = name;
-        document.getElementById('editTargetFolderId').value = id;
-    }
-});
-
-// 源目录选择触发
-const shareFolder = document.getElementById('shareFolder');
-shareFolder.addEventListener('click', (e) => {
-    e.preventDefault();
-    const accountId = document.getElementById('accountId').value;
-    if (!accountId) {
-        alert('请先选择账号');
-        return;
-    }
-    shareFolderSelector.show(accountId);
-});
-
-// 更新目录选择触发
-const editTargetFolder = document.getElementById('editTargetFolder');
-editTargetFolder.addEventListener('click', (e) => {
-    e.preventDefault();
-    const accountId = document.getElementById('accountId').value;
-    if (!accountId) {
-        alert('请先选择账号');
-        return;
-    }
-    targetFolderSelector.show(accountId);
-});
-</script>

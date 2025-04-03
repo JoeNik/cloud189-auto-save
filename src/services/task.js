@@ -398,6 +398,7 @@ class TaskService {
                 saveResults.push(notificationMessage);
                 task.status = 'processing';
                 task.lastFileUpdateTime = new Date();
+                task.currentEpisodes += 1;
                 await this.taskRepo.save(task);
             }
             return saveResults.length > 0 ? saveResults.join('\n\n') : null;

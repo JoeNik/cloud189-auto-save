@@ -1,26 +1,107 @@
+require('reflect-metadata');
 require('dotenv').config();
 const express = require('express');
 const cron = require('node-cron');
-const basicAuth = require('express-basic-auth');
+const session = require('express-session');
+const TypeormStore = require('connect-typeorm').TypeormStore;
 const fs = require('fs').promises;
 const path = require('path');
 const { AppDataSource } = require('./database');
-const { Account, Task, TaskLog } = require('./entities');
+const { Account, Task, TaskLog, Session } = require('./entities');
 const { TaskService } = require('./services/task');
 const { Cloud189Service } = require('./services/cloud189');
 const { MessageUtil } = require('./services/message');
-const { CacheManager } = require('./services/CacheManager')
+const { CacheManager } = require('./services/CacheManager');
+const cryptoUtil = require('./utils/crypto');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('src/public'));
 
-// 添加HTTP基本认证
-app.use(basicAuth({
-    users: { [process.env.AUTH_USERNAME]: process.env.AUTH_PASSWORD },
-    challenge: true,
-    realm: encodeURIComponent('天翼云盘自动转存系统')
+// 初始化session存储
+const sessionRepository = AppDataSource.getRepository(Session);
+
+// 配置session中间件
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    store: new TypeormStore({
+        cleanupLimit: 2,
+        limitSubquery: false,
+        ttl: 86400 // 1天过期
+    }).connect(sessionRepository),
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 86400000 // 1天
+    },
+    name: 'cloud189.sid',
+    rolling: true
 }));
+
+// 登录验证中间件
+const authMiddleware = (req, res, next) => {
+    // 检查是否已登录
+    if (req.session.user) {
+        next();
+    } else {
+        res.status(401).json({ success: false, error: '未登录或会话已过期' });
+    }
+};
+
+// 检查登录状态API
+app.get('/api/auth/check', (req, res) => {
+    if (req.session.user) {
+        res.json({ 
+            success: true, 
+            data: { 
+                username: req.session.user.username,
+                loginTime: req.session.user.loginTime
+            } 
+        });
+    } else {
+        res.status(401).json({ success: false, error: '未登录或会话已过期' });
+    }
+});
+
+// 登录接口
+app.post('/api/login', async (req, res) => {
+    const { username, password, remember } = req.body;
+    
+    // 验证用户名和密码
+    if (username === process.env.AUTH_USERNAME && 
+        cryptoUtil.verifyPassword(password, process.env.AUTH_PASSWORD)) {
+        
+        // 设置session
+        req.session.user = {
+            username,
+            loginTime: new Date()
+        };
+
+        // 如果选择了记住登录,延长cookie过期时间
+        if (remember) {
+            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30天
+        }
+
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false, error: '用户名或密码错误' });
+    }
+});
+
+// 登出接口
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+// 给需要保护的API添加验证中间件
+app.use('/api/accounts', authMiddleware);
+app.use('/api/tasks', authMiddleware);
+app.use('/api/folders', authMiddleware);
+app.use('/api/share', authMiddleware);
+app.use('/api/config', authMiddleware);
 
 // 初始化数据库连接
 AppDataSource.initialize().then(() => {
@@ -35,26 +116,39 @@ AppDataSource.initialize().then(() => {
 
     // 账号相关API
     app.get('/api/accounts', async (req, res) => {
-        const accounts = await accountRepo.find();
-        // 获取容量
-        for (const account of accounts) {
-            const cloud189 = Cloud189Service.getInstance(account);
-            const capacity = await cloud189.client.getUserSizeInfo()
-            account.capacity = {
-                cloudCapacityInfo: null,
-                familyCapacityInfo: null
+        try {
+            console.log('正在获取账号列表...');
+            const accounts = await accountRepo.find();
+            console.log(`找到 ${accounts.length} 个账号`);
+            // 获取容量并处理敏感信息
+            for (const account of accounts) {
+                const cloud189 = Cloud189Service.getInstance(account);
+                const capacity = await cloud189.client.getUserSizeInfo();
+                account.capacity = {
+                    cloudCapacityInfo: null,
+                    familyCapacityInfo: null
+                };
+                if (capacity && capacity.res_code == 0) {
+                    account.capacity.cloudCapacityInfo = capacity.cloudCapacityInfo;
+                    account.capacity.familyCapacityInfo = capacity.familyCapacityInfo;
+                }
+                // 脱敏处理
+                account.username = cryptoUtil.maskSensitiveInfo(account.username);
+                account.password = cryptoUtil.maskSensitiveInfo(account.password);
             }
-            if (capacity && capacity.res_code == 0) {
-                account.capacity.cloudCapacityInfo = capacity.cloudCapacityInfo;
-                account.capacity.familyCapacityInfo = capacity.familyCapacityInfo;
-            }
+            res.json({ success: true, data: accounts });
+        } catch (error) {
+            console.error('获取账号列表失败:', error);
+            res.status(500).json({ success: false, error: error.message });
         }
-        res.json({ success: true, data: accounts });
     });
 
     app.post('/api/accounts', async (req, res) => {
         try {
-            const account = accountRepo.create(req.body);
+            const accountData = { ...req.body };
+            // 加密密码
+            accountData.password = cryptoUtil.encrypt(accountData.password);
+            const account = accountRepo.create(accountData);
             await accountRepo.save(account);
             res.json({ success: true, data: account });
         } catch (error) {
@@ -75,10 +169,17 @@ AppDataSource.initialize().then(() => {
 
     // 任务相关API
     app.get('/api/tasks', async (req, res) => {
-        const tasks = await taskRepo.find({
-            order: { id: 'DESC' }
-        });
-        res.json({ success: true, data: tasks });
+        try {
+            console.log('正在获取任务列表...');
+            const tasks = await taskRepo.find({
+                order: { id: 'DESC' }
+            });
+            console.log(`找到 ${tasks.length} 个任务`);
+            res.json({ success: true, data: tasks });
+        } catch (error) {
+            console.error('获取任务列表失败:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
     });
 
     app.post('/api/tasks', async (req, res) => {

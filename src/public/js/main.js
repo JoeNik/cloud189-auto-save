@@ -1,5 +1,6 @@
 // 主入口文件
 document.addEventListener('DOMContentLoaded', () => {
+    checkLogin();
     initializeApp();
 });
 
@@ -342,7 +343,7 @@ async function initializeApp() {
     setInterval(() => {
         fetchAccounts();
         fetchTasks();
-    }, 30000);
+    }, 600000);
 }
 
 // 处理任务提交
@@ -545,7 +546,7 @@ async function deleteTask(taskId) {
             alert('任务删除成功');
             fetchTasks();
         } else {
-            throw new Error('删除任务失败');
+            alert('删除任务失败');
         }
     } catch (error) {
         console.error('删除任务失败:', error);
@@ -883,5 +884,40 @@ class ShareFolderSelector {
             console.error('获取分享目录失败:', error);
             alert(error.message || '获取分享目录失败');
         }
+    }
+}
+
+// 检查登录状态
+async function checkLogin() {
+    try {
+        const response = await fetch('/api/auth/check');
+        if (!response.ok) {
+            window.location.href = '/login.html';
+            return;
+        }
+        const data = await response.json();
+        if (!data.success) {
+            window.location.href = '/login.html';
+        }
+    } catch (error) {
+        alert('检查登录状态失败: ' + error.message);
+        window.location.href = '/login.html';
+    }
+}
+
+// 登出函数
+async function logout() {
+    try {
+        const response = await fetch('/api/logout', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        if (data.success) {
+            window.location.href = '/login.html';
+        } else {
+            alert('登出失败');
+        }
+    } catch (error) {
+        alert('登出失败: ' + error.message);
     }
 }

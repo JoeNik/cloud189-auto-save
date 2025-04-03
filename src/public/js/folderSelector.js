@@ -77,7 +77,7 @@ class FolderSelector {
         }
 
         if (!this.accountId) {
-            alert('请先选择账号');
+            toast.error('请先选择账号');
             return;
         }
 
@@ -103,7 +103,7 @@ class FolderSelector {
             });
             this.close();
         } else {
-            alert('请选择一个目录');
+            toast.error('请选择一个目录');
         }
     }
 
@@ -116,11 +116,11 @@ class FolderSelector {
                 const nodes = this.apiConfig.parseResponse(data);
                 this.renderFolderNodes(nodes, parentElement);
             } else {
-                alert('获取目录失败: ' + (data.error || '未知错误'));
+                toast.error('获取目录失败: ' + (data.error || '未知错误'));
             }
         } catch (error) {
             console.error('加载目录失败:', error);
-            alert('加载目录失败');
+            toast.error('加载目录失败');
         }
     }
 

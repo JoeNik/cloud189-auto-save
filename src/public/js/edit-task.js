@@ -45,41 +45,31 @@ function closeEditTaskModal() {
 function initEditTaskForm() {
     document.getElementById('shareFolder').addEventListener('click', (e) => {
         e.preventDefault();
-        const accountId = document.getElementById('accountId').value;
-        if (!accountId) {
-            alert('请先选择账号');
-            return;
-        }
-        shareFolderSelector.show(accountId);
+        document.getElementById('shareFolderSelect').style.display = 'block';
+        loadShareFolders();
     });
 
-    // 更新目录也改为点击触发
-    document.getElementById('editTargetFolder').addEventListener('click', (e) => {
+    document.getElementById('closeShareFolderSelect').addEventListener('click', (e) => {
         e.preventDefault();
-        const accountId = document.getElementById('accountId').value;
-        if (!accountId) {
-            alert('请先选择账号');
-            return;
-        }
-        editFolderSelector.show(accountId);
+        document.getElementById('shareFolderSelect').style.display = 'none';
     });
 
     document.getElementById('editTaskForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const id = document.getElementById('editTaskId').value;
         const resourceName = document.getElementById('editResourceName').value;
         const targetFolderId = document.getElementById('editTargetFolderId').value;
-        const targetFolderName = document.getElementById('editTargetFolder').value;
+        const targetFolderName = document.getElementById('editTargetFolderName').value;
         const currentEpisodes = document.getElementById('editCurrentEpisodes').value;
         const totalEpisodes = document.getElementById('editTotalEpisodes').value;
+        const status = document.getElementById('editStatus').value;
+        const shareFolderName = document.getElementById('editShareFolderName').value;
+        const shareFolderId = document.getElementById('editShareFolderId').value;
         const episodeThreshold = document.getElementById('editEpisodeThreshold').value;
         const episodeRegex = document.getElementById('editEpisodeRegex').value;
         const whitelistKeywords = document.getElementById('editWhitelistKeywords').value;
         const blacklistKeywords = document.getElementById('editBlacklistKeywords').value;
-        const shareFolderName = document.getElementById('shareFolder').value;
-        const shareFolderId = document.getElementById('shareFolderId').value;
-        const status = document.getElementById('editStatus').value;
-        console.log(333,targetFolderName,shareFolderName);
 
         try {
             const response = await fetch(`/api/tasks/${id}`, {
@@ -104,12 +94,47 @@ function initEditTaskForm() {
             if (response.ok) {
                 closeEditTaskModal();
                 await fetchTasks();
+                toast.success('任务修改成功');
             } else {
                 const error = await response.json();
-                alert(error.message || '修改任务失败');
+                toast.error(error.message || '修改任务失败');
             }
         } catch (error) {
-            alert('修改任务失败：' + error.message);
+            toast.error('修改任务失败：' + error.message);
         }
     });
+}
+
+// 加载分享文件夹列表
+async function loadShareFolders() {
+    const taskId = document.getElementById('editTaskId').value;
+    const accountId = document.getElementById('editAccountId').value;
+    
+    if (!taskId || !accountId) {
+        toast.error('任务ID或账号ID不存在');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/share/folders/${accountId}?taskId=${taskId}&folderId=-11`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const selectElement = document.getElementById('shareFolderOptions');
+            selectElement.innerHTML = '';
+            
+            data.data.forEach(folder => {
+                const option = document.createElement('option');
+                option.value = folder.id;
+                option.textContent = folder.name;
+                selectElement.appendChild(option);
+            });
+            
+            document.getElementById('shareFolderTreeContainer').style.display = 'block';
+        } else {
+            toast.error('加载文件夹列表失败');
+        }
+    } catch (error) {
+        toast.error('加载文件夹列表失败: ' + error.message);
+    }
 }
