@@ -12,6 +12,26 @@
     <link rel="stylesheet" href="/css/table.css">
     <link rel="stylesheet" href="/css/tabs.css">
     <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        // 简单的加密函数
+        function encryptPassword(password, publicKey, timestamp) {
+            
+            // 确保使用16字节的IV，与后端一致
+            const ivHex = '0123456789abcdef0123456789abcdef';
+            const iv = CryptoJS.enc.Hex.parse(ivHex);
+            const key = CryptoJS.SHA256(publicKey);
+            
+            const encrypted = CryptoJS.AES.encrypt(password, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            
+            const result = encrypted.toString();
+            return result;
+        }
+    </script>
 </head>
 <body>
     <div class="container">
@@ -220,7 +240,6 @@
 // 源目录选择器
 const shareFolderSelector = new FolderSelector({
     onSelect: ({ id, name }) => {
-        console.log(1234,id, name);
         document.getElementById('shareFolder').value = name;
         document.getElementById('shareFolderId').value = id;
     }

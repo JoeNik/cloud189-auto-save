@@ -80,10 +80,29 @@ async function initAccountForm() {
         const password = document.getElementById('password').value;
     
         try {
+            // 先获取加密密钥
+            const keyResponse = await fetch('/api/auth/encryption-key');
+            const keyData = await keyResponse.json();
+            
+            if (!keyData.success) {
+                alert('获取加密密钥失败: ' + (keyData.error || '未知错误'));
+                return;
+            }
+            
+            // 使用新的加密函数加密密码
+            const encryptedPassword = encryptPassword(password, keyData.publicKey, keyData.timestamp);
+            
             const response = await fetch('/api/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ 
+                    username, 
+                    password: encryptedPassword,
+                    encryptionData: {
+                        timestamp: keyData.timestamp,
+                        keyId: keyData.keyId
+                    }
+                })
             });
     
             const data = await response.json();

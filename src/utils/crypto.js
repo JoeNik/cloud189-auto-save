@@ -4,12 +4,21 @@ class CryptoUtil {
     constructor(secretKey = process.env.CRYPTO_SECRET_KEY || 'your-secret-key') {
         this.secretKey = secretKey;
         this.algorithm = 'aes-256-cbc';
+        // 使用固定的 IV 以简化实现
+        this.iv = Buffer.from('0123456789abcdef0123456789abcdef'.slice(0, 16));
     }
 
     // 生成密码哈希
     hashPassword(password) {
         return crypto.createHash('sha256')
             .update(password + this.secretKey)
+            .digest('hex');
+    }
+
+    // 基于挑战-响应的密码哈希
+    hashChallengePassword(password, salt, timestamp) {
+        return crypto.createHash('sha256')
+            .update(password + salt + timestamp)
             .digest('hex');
     }
 
@@ -20,29 +29,70 @@ class CryptoUtil {
         return password === envPasswordHash;
     }
 
-    // 加密数据
+    // 简单的AES加密
     encrypt(text) {
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv(this.algorithm, Buffer.from(this.secretKey), iv);
-        let encrypted = cipher.update(text);
-        encrypted = Buffer.concat([encrypted, cipher.final()]);
-        return iv.toString('hex') + ':' + encrypted.toString('hex');
+        try {
+            // 确保密钥长度为32字节(256位)
+            const key = crypto.createHash('sha256').update(this.secretKey).digest();
+            const cipher = crypto.createCipheriv(this.algorithm, key, this.iv);
+            let encrypted = cipher.update(text, 'utf8', 'base64');
+            encrypted += cipher.final('base64');
+            return encrypted;
+        } catch (error) {
+            console.error('加密失败:', error);
+            throw error;
+        }
     }
 
-    // 解密数据
+    // 简单的AES解密
     decrypt(text) {
         try {
-            console.log('解密数据:', text);
-            const textParts = text.split(':');
-            const iv = Buffer.from(textParts.shift(), 'hex');
-            const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-            const decipher = crypto.createDecipheriv(this.algorithm, Buffer.from(this.secretKey), iv);
-            let decrypted = decipher.update(encryptedText);
-            decrypted = Buffer.concat([decrypted, decipher.final()]);
-            return decrypted.toString();
+            // 确保密钥长度为32字节(256位)
+            const key = crypto.createHash('sha256').update(this.secretKey).digest();
+            const decipher = crypto.createDecipheriv(this.algorithm, key, this.iv);
+            let decrypted = decipher.update(text, 'base64', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
         } catch (error) {
             console.error('解密失败:', error);
-            return text; // 如果解密失败,返回原文
+            throw error;
+        }
+    }
+
+    // 使用临时密钥的AES解密
+    aesDecrypt(ciphertext, tempKey) {
+        try {
+            console.log('解密开始，参数:', {
+                ciphertext: ciphertext,
+                tempKey: tempKey
+            });
+            
+            // 确保IV长度为16字节(128位)
+            // 在16进制表示中，每两个字符代表1字节，所以需要32个16进制字符
+            const ivHex = '0123456789abcdef0123456789abcdef';
+            const iv = Buffer.from(ivHex.slice(0, 32), 'hex');
+            console.log('IV(hex):', iv.toString('hex'));
+            console.log('IV长度(字节):', iv.length);
+            
+            // 使用与前端相同的密钥派生方式
+            const key = crypto.createHash('sha256').update(tempKey).digest();
+            console.log('派生的密钥:', key.toString('hex'));
+            
+            // 从base64解码密文
+            const encryptedBytes = Buffer.from(ciphertext, 'base64');
+            console.log('解码后的密文长度:', encryptedBytes.length);
+            console.log('解码后的密文(hex):', encryptedBytes.toString('hex'));
+            
+            const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+            let decrypted = decipher.update(encryptedBytes);
+            decrypted = Buffer.concat([decrypted, decipher.final()]);
+            
+            const result = decrypted.toString('utf8');
+            console.log('解密成功，结果:', result);
+            return result;
+        } catch (error) {
+            console.error('解密失败，详细错误:', error);
+            throw error;
         }
     }
 

@@ -13,7 +13,6 @@ let shareFolderSelector = new FolderSelector({
 
 let editFolderSelector = new FolderSelector({
     onSelect: ({ id, name }) => {
-        console.log(2222,id,name);
         document.getElementById('editTargetFolder').value = name;
         document.getElementById('editTargetFolderId').value = id;
     }

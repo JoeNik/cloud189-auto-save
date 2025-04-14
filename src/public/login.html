@@ -86,11 +86,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="js/toast.js"></script>
     <script>
-        // 密码加密函数
-        function hashPassword(password, secretKey = 'your-secret-key') {
-            return CryptoJS.SHA256(password + secretKey).toString();
-        }
-
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -98,24 +93,41 @@
             const password = document.getElementById('password').value;
             const remember = document.getElementById('remember').checked;
 
-            // 对密码进行加密
-            const hashedPassword = hashPassword(password);
-
             try {
-                const response = await fetch('/api/login', {
+                // 第1步：请求服务端挑战（获取随机盐值）
+                const challengeResponse = await fetch('/api/auth/challenge', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                
+                const challengeData = await challengeResponse.json();
+                
+                if (!challengeData.success) {
+                    alert(challengeData.error || '获取登录挑战失败');
+                    return;
+                }
+                
+                // 第2步：使用随机盐值对密码进行加密
+                const salt = challengeData.salt;
+                const timestamp = challengeData.timestamp;
+                const hashedPassword = CryptoJS.SHA256(password + salt + timestamp).toString();
+                
+                // 第3步：发送用户名和加密后的密码到服务端验证
+                const loginResponse = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         username, 
-                        password: hashedPassword, 
+                        password: hashedPassword,
+                        salt,
+                        timestamp,
                         remember 
                     })
                 });
 
-                const data = await response.json();
-                if (data.success) {
+                const loginData = await loginResponse.json();
+                if (loginData.success) {
                     window.location.href = '/index.html';
                 } else {
                     toast.error(data.error || '登录失败');

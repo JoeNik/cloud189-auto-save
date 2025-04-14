@@ -43,6 +43,7 @@ class Cloud189Service {
                 shareMode: shareMode,
                 pageNum: 1,
                 pageSize: 1000,
+                descending:true,
                 accessCode
             },
             headers: {

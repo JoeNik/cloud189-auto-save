@@ -1,18 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index, PrimaryColumn } from 'typeorm';
+import { ISession } from 'connect-typeorm';
 
 @Entity()
-class Account {
+export class Account {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column('text')
+    @Column()
     username!: string;
 
-    @Column('text')
+    @Column()
     password!: string;
-
-    @Column('boolean', { default: true })
-    isActive!: boolean;
 
     @CreateDateColumn()
     createdAt!: Date;
@@ -22,24 +20,30 @@ class Account {
 }
 
 @Entity()
-class Task {
+export class Task {
     @PrimaryGeneratedColumn()
     id!: number;
-
-    @Column('integer')
-    accountId!: number;
 
     @Column('text')
     shareLink!: string;
 
+    @Column()
+    accountId!: number;
+
+    @Column()
+    shareId!: string;
+
+    @Column('text', { nullable: true })
+    shareFolderId!: string;
+
+    @Column()
+    shareFileId!: string;
+
+    @Column({ nullable: true })
+    shareFolderName?: string;
+
     @Column('text', { nullable: true })
     videoType!: string;
-
-    @Column('text', { default: 'pending' })
-    status!: string;
-
-    @Column('text', { nullable: true })
-    lastError!: string;
 
     @Column('datetime', { nullable: true })
     lastCheckTime!: Date;
@@ -47,35 +51,47 @@ class Task {
     @Column('datetime', { nullable: true })
     lastFileUpdateTime!: Date;
 
-    @Column('text', { nullable: true })
+    @Column()
     resourceName!: string;
 
-    @Column('integer', { default: 0 })
-    totalEpisodes!: number;
-
-    @Column('integer', { default: 0 })
-    currentEpisodes!: number;
-
-    @Column('text', { nullable: true })
+    @Column()
     targetFolderId!: string;
 
-    @Column('text', { nullable: true })
-    targetFolderName!: string;
+    @Column({ nullable: true })
+    targetFolderName?: string;
 
-    @Column('text', { nullable: true })
-    shareFileId!: string;
+    @Column({ default: 0 })
+    currentEpisodes!: number;
 
-    @Column('text', { nullable: true })
-    shareFolderId!: string;
+    @Column({ default: 0 })
+    totalEpisodes!: number;
 
-    @Column('text', { nullable: true })
-    shareFolderName!: string;
+    @Column({ default: 0 })
+    episodeThreshold!: number;
 
-    @Column('text', { nullable: true })
-    shareId!: string;
-    
-    @Column('text', { nullable: true })
-    shareMode!: string;
+    @Column({ nullable: true })
+    episodeRegex?: string;
+
+    @Column({ nullable: true })
+    sourceRegex?: string;
+
+    @Column({ nullable: true })
+    targetRegex?: string;
+
+    @Column({ nullable: true })
+    whitelistKeywords?: string;
+
+    @Column({ nullable: true })
+    blacklistKeywords?: string;
+
+    @Column({ default: 'pending' })
+    status!: string;
+
+    @Column({ default: 0 })
+    shareMode!: number;
+
+    @Column({ nullable: true })
+    accessCode?: string;
 
     @Column('text', { nullable: true })
     pathType!: string;
@@ -85,38 +101,17 @@ class Task {
 
     @UpdateDateColumn()
     updatedAt!: Date;
-
-    @Column('text', { nullable: true })
-    accessCode!: string;
-
-    @Column('text', { nullable: true })
-    sourceRegex!: string;
-    
-    @Column('text', { nullable: true })
-    targetRegex!: string;
-
-    @Column('integer', { nullable: true, default: 0 })
-    episodeThreshold!: number;
-
-    @Column('text', { nullable: true })
-    episodeRegex!: string;
-
-    @Column('text', { nullable: true })
-    whitelistKeywords!: string;
-
-    @Column('text', { nullable: true })
-    blacklistKeywords!: string;
 }
 
 @Entity()
-class TaskLog {
+export class TaskLog {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column('integer')
+    @Column()
     taskId!: number;
 
-    @Column('text')
+    @Column()
     message!: string;
 
     @CreateDateColumn()
@@ -124,20 +119,20 @@ class TaskLog {
 }
 
 @Entity('sessions')
-@Index(['expiredAt'])
-class Session {
-    @PrimaryGeneratedColumn('uuid')
-    id!: string;
+export class Session implements ISession {
+    @PrimaryColumn('varchar')
+    id: string = '';
 
+    @Index()
     @Column('bigint')
-    expiredAt!: number;
+    expiredAt: number = Date.now();
 
-    @Column('text', { nullable: true })
-    data!: string;
+    @Column('text')
+    json: string = '';
 
-    @Column('text', { nullable: true })
-    json!: string;
+    @CreateDateColumn()
+    createdAt: Date = new Date();
+
+    @UpdateDateColumn()
+    updatedAt: Date = new Date();
 }
-
-export { Account, Task, TaskLog, Session };
-export default { Account, Task, TaskLog, Session };

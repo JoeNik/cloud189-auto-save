@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const cron = require('node-cron');
 const session = require('express-session');
-const TypeormStore = require('connect-typeorm').TypeormStore;
 const fs = require('fs').promises;
 const path = require('path');
 const { AppDataSource } = require('./database');
@@ -12,33 +11,22 @@ const { TaskService } = require('./services/task');
 const { Cloud189Service } = require('./services/cloud189');
 const { MessageUtil } = require('./services/message');
 const { CacheManager } = require('./services/CacheManager');
+const { CustomSessionStore } = require('./services/SessionStore');
 const cryptoUtil = require('./utils/crypto');
+const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
 app.use(express.static('src/public'));
 
-// 初始化session存储
-const sessionRepository = AppDataSource.getRepository(Session);
-
-// 配置session中间件
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    store: new TypeormStore({
-        cleanupLimit: 2,
-        limitSubquery: false,
-        ttl: 86400 // 1天过期
-    }).connect(sessionRepository),
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: true,
-        maxAge: 86400000 // 1天
-    },
-    name: 'cloud189.sid',
-    rolling: true
-}));
+// 给需要保护的API添加验证中间件的函数，在数据库初始化后使用
+const addAuthMiddleware = () => {
+    app.use('/api/accounts', authMiddleware);
+    app.use('/api/tasks', authMiddleware);
+    app.use('/api/folders', authMiddleware);
+    app.use('/api/share', authMiddleware);
+    app.use('/api/config', authMiddleware);
+};
 
 // 登录验证中间件
 const authMiddleware = (req, res, next) => {
@@ -50,59 +38,6 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
-// 检查登录状态API
-app.get('/api/auth/check', (req, res) => {
-    if (req.session.user) {
-        res.json({ 
-            success: true, 
-            data: { 
-                username: req.session.user.username,
-                loginTime: req.session.user.loginTime
-            } 
-        });
-    } else {
-        res.status(401).json({ success: false, error: '未登录或会话已过期' });
-    }
-});
-
-// 登录接口
-app.post('/api/login', async (req, res) => {
-    const { username, password, remember } = req.body;
-    
-    // 验证用户名和密码
-    if (username === process.env.AUTH_USERNAME && 
-        cryptoUtil.verifyPassword(password, process.env.AUTH_PASSWORD)) {
-        
-        // 设置session
-        req.session.user = {
-            username,
-            loginTime: new Date()
-        };
-
-        // 如果选择了记住登录,延长cookie过期时间
-        if (remember) {
-            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30天
-        }
-
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ success: false, error: '用户名或密码错误' });
-    }
-});
-
-// 登出接口
-app.post('/api/logout', (req, res) => {
-    req.session.destroy();
-    res.json({ success: true });
-});
-
-// 给需要保护的API添加验证中间件
-app.use('/api/accounts', authMiddleware);
-app.use('/api/tasks', authMiddleware);
-app.use('/api/folders', authMiddleware);
-app.use('/api/share', authMiddleware);
-app.use('/api/config', authMiddleware);
-
 // 初始化数据库连接
 AppDataSource.initialize().then(() => {
     console.log('数据库连接成功');
@@ -113,6 +48,205 @@ AppDataSource.initialize().then(() => {
     const messageUtil = new MessageUtil();
     // 初始化缓存管理器
     const folderCache = new CacheManager(parseInt(process.env.FOLDER_CACHE_TTL || 600));
+
+    // 初始化session存储
+    const sessionRepository = AppDataSource.getRepository(Session);
+    const sessionStore = new CustomSessionStore(sessionRepository);
+    
+    // 配置session中间件
+    app.use(session({
+        name: 'cloud189.sid',
+        secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+        resave: false,
+        saveUninitialized: false,
+        rolling: true,
+        store: sessionStore,
+        cookie: {
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: true,
+            maxAge: 86400000, // 24小时
+            sameSite: 'lax'
+        }
+    }));
+
+    // 添加会话调试中间件
+    app.use((req, res, next) => {
+        const oldSave = req.session.save;
+        req.session.save = function(cb) {
+            console.log('保存会话:', {
+                id: req.sessionID,
+                data: req.session
+            });
+            return oldSave.call(req.session, function(err) {
+                if (err) {
+                    console.error('会话保存错误:', err);
+                }
+                if (cb) cb(err);
+            });
+        };
+        next();
+    });
+    
+    // 检查登录状态API - 必须在session中间件之后
+    app.get('/api/auth/check', (req, res) => {
+        if (req.session.user) {
+            res.json({ 
+                success: true, 
+                data: { 
+                    username: req.session.user.username,
+                    loginTime: req.session.user.loginTime
+                } 
+            });
+        } else {
+            res.status(401).json({ success: false, error: '未登录或会话已过期' });
+        }
+    });
+    
+    // 登录验证挑战（生成随机盐值）
+    app.post('/api/auth/challenge', (req, res) => {
+        const { username } = req.body;
+
+        // 生成随机盐值
+        const salt = crypto.randomBytes(16).toString('hex');
+        const timestamp = Date.now();
+
+        // 存储挑战信息到session，供之后的登录验证使用
+        req.session.loginChallenge = {
+            salt,
+            timestamp,
+            username,
+            expires: timestamp + 5 * 60 * 1000 // 5分钟有效期
+        };
+        
+        // 确保会话保存
+        req.session.save(err => {
+            if (err) {
+                console.error('保存会话失败:', err);
+                return res.status(500).json({ 
+                    success: false, 
+                    error: '会话保存失败' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                salt,
+                timestamp
+            });
+        });
+    });
+    
+    // 登录接口
+    app.post('/api/login', async (req, res) => {
+        const { username, password, salt, timestamp, remember } = req.body;
+        
+        // 检查会话是否存在
+        if (!req.session) {
+            return res.status(500).json({
+                success: false,
+                error: '会话初始化失败'
+            });
+        }
+        
+        // 检查挑战是否有效
+        const challenge = req.session.loginChallenge;
+        console.log('登录挑战信息:', challenge);
+        
+        if (!challenge || 
+            challenge.salt !== salt || 
+            challenge.timestamp !== timestamp ||
+            challenge.username !== username || 
+            challenge.expires < Date.now()) {
+            
+            return res.status(401).json({ 
+                success: false, 
+                error: '登录挑战无效或已过期，请重新登录'
+            });
+        }
+
+        // 在服务器端计算预期的密码哈希
+        const expectedHash = cryptoUtil.hashChallengePassword(
+            process.env.AUTH_PASSWORD, 
+            salt, 
+            timestamp
+        );
+        
+        // 验证用户名和密码
+        if (username === process.env.AUTH_USERNAME && password === expectedHash) {
+            // 设置session
+            req.session.user = {
+                username,
+                loginTime: new Date()
+            };
+
+            // 如果选择了记住登录,延长cookie过期时间
+            if (remember) {
+                req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30天
+            }
+
+            // 清除挑战信息
+            delete req.session.loginChallenge;
+
+            // 确保会话保存
+            req.session.save(err => {
+                if (err) {
+                    console.error('保存会话失败2:', err);
+                    return res.status(500).json({ 
+                        success: false, 
+                        error: '会话保存失败' 
+                    });
+                }
+                
+                res.json({ success: true });
+            });
+        } else {
+            res.status(401).json({ success: false, error: '用户名或密码错误' });
+        }
+    });
+    
+    // 登出接口
+    app.post('/api/logout', (req, res) => {
+        req.session.destroy(err => {
+            if (err) {
+                console.error('销毁会话失败:', err);
+                return res.status(500).json({ success: false, error: '登出失败' });
+            }
+            res.json({ success: true });
+        });
+    });
+    
+    // 提供临时加密密钥的端点
+    app.get('/api/auth/encryption-key', (req, res) => {
+        // 生成临时密钥和ID
+        const keyId = crypto.randomBytes(8).toString('hex');
+        const publicKey = crypto.randomBytes(16).toString('hex');
+        const timestamp = Date.now();
+        
+        // 存储密钥信息到会话中，服务器端会用这个解密
+        req.session.encryptionKeys = req.session.encryptionKeys || {};
+        req.session.encryptionKeys[keyId] = {
+            publicKey,
+            timestamp,
+            expires: timestamp + 10 * 60 * 1000 // 10分钟过期
+        };
+        
+        // 清理过期的密钥
+        for (const id in req.session.encryptionKeys) {
+            if (req.session.encryptionKeys[id].expires < Date.now()) {
+                delete req.session.encryptionKeys[id];
+            }
+        }
+        
+        res.json({
+            success: true,
+            publicKey,
+            timestamp,
+            keyId
+        });
+    });
+
+    // 添加会话验证中间件
+    addAuthMiddleware();
 
     // 账号相关API
     app.get('/api/accounts', async (req, res) => {
@@ -145,11 +279,50 @@ AppDataSource.initialize().then(() => {
 
     app.post('/api/accounts', async (req, res) => {
         try {
-            const accountData = { ...req.body };
-            // 加密密码
-            accountData.password = cryptoUtil.encrypt(accountData.password);
+            const { username, password, encryptionData } = req.body;
+            
+            if (!encryptionData || !encryptionData.keyId || !encryptionData.timestamp) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: '请求缺少必要的加密信息' 
+                });
+            }
+            
+            // 验证加密密钥是否有效
+            const { keyId, timestamp } = encryptionData;
+            const keyInfo = req.session.encryptionKeys && req.session.encryptionKeys[keyId];
+            
+            if (!keyInfo || keyInfo.expires < Date.now()) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: '加密密钥无效或已过期' 
+                });
+            }
+            
+            // 使用临时公钥解密
+            let decryptedPassword;
+            try {
+                decryptedPassword = cryptoUtil.aesDecrypt(password, keyInfo.publicKey);
+            } catch (e) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: '密码解密失败' 
+                });
+            }
+            
+            // 创建账号数据,直接使用解密后的密码
+            const accountData = { 
+                username,
+                password: decryptedPassword // 直接使用解密后的密码
+            };
+            
+            // 保存账号
             const account = accountRepo.create(accountData);
             await accountRepo.save(account);
+            
+            // 清除已使用的加密密钥
+            delete req.session.encryptionKeys[keyId];
+            
             res.json({ success: true, data: account });
         } catch (error) {
             res.json({ success: false, error: error.message });

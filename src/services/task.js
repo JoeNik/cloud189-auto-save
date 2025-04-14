@@ -128,6 +128,7 @@ class TaskService {
     // 解析分享链接
     async getShareInfo(cloud189, shareCode) {
          const shareInfo = await cloud189.getShareInfo(shareCode);
+         console.Console("shareinfo ----111---",shareInfo)
          if (!shareInfo) throw new Error('获取分享信息失败');
          return shareInfo;
     }
