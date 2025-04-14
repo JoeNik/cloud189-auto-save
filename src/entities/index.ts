@@ -96,6 +96,9 @@ export class Task {
     @Column('text', { nullable: true })
     pathType!: string;
 
+    @Column('text', { nullable: true })
+    cronExpression?: string;
+
     @CreateDateColumn()
     createdAt!: Date;
 

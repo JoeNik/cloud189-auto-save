@@ -391,6 +391,7 @@ async function handleEditTaskSubmit(e) {
         episodeRegex: document.getElementById('editEpisodeRegex').value || null,
         whitelistKeywords: document.getElementById('editWhitelistKeywords').value || null,
         blacklistKeywords: document.getElementById('editBlacklistKeywords').value || null,
+        cronExpression: document.getElementById('editCronExpression').value || null,
         targetFolderId: document.getElementById('editTargetFolderId').value || null,
         targetFolderName: document.getElementById('editTargetFolder').value || null,
         shareFolderId: document.getElementById('shareFolderId').value || null,
@@ -475,7 +476,7 @@ async function loadTasks() {
 }
 
 // 显示编辑任务模态框
-async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink,accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
+async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
@@ -483,6 +484,7 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
+    document.getElementById('editCronExpression').value = cronExpression || '';
     document.getElementById('editStatus').value = status;
     document.getElementById('shareFolder').value = shareFolderName || '';
     document.getElementById('shareFolderId').value = shareFolderId || '';

@@ -357,6 +357,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input type="text" id="editBlacklistKeywords" placeholder="多个关键字用英文逗号分隔，例如：sample,trailer">
             </div>
             <div class="form-group">
+                <label for="editCronExpression">定时任务表达式</label>
+                <input type="text" id="editCronExpression" placeholder="自定义cron表达式，为空则使用全局设置">
+                <small>例如：0 */2 * * * 表示每2小时执行一次</small>
+            </div>
+            <div class="form-group">
                 <label for="editStatus">状态</label>
                 <select id="editStatus" required>
                     <option value="pending">待处理</option>

@@ -447,7 +447,8 @@ class TaskService {
         const allowedFields = [
             'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
             'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
-            'episodeThreshold', 'episodeRegex', 'whitelistKeywords', 'blacklistKeywords'
+            'episodeThreshold', 'episodeRegex', 'whitelistKeywords', 'blacklistKeywords',
+            'cronExpression'
         ];
         for (const field of allowedFields) {
             if (updates[field] !== undefined) {

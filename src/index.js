@@ -412,15 +412,58 @@ AppDataSource.initialize().then(() => {
         }
     });
 
-    app.delete('/api/tasks/:id', async (req, res) => {
-        try {
-            await taskService.deleteTask(parseInt(req.params.id));
-            res.json({ success: true });
-        } catch (error) {
-            res.json({ success: false, error: error.message });
-        }
-    });
+    // 存储定时任务的映射关系，方便后续更新或删除
+    const taskSchedulers = new Map();
 
+    // 为任务创建或更新定时任务
+    const createOrUpdateTaskScheduler = (task) => {
+        // 如果已存在此任务的定时器，先移除旧的
+        if (taskSchedulers.has(task.id)) {
+            const oldScheduler = taskSchedulers.get(task.id);
+            oldScheduler.stop();
+            taskSchedulers.delete(task.id);
+            console.log(`已停止任务[${task.id}]的旧定时任务`);
+        }
+        
+        // 如果任务有自定义cron表达式，创建新的定时任务
+        if (task.cronExpression) {
+            try {
+                const scheduler = cron.schedule(task.cronExpression, async () => {
+                    console.log(`执行自定义定时任务[${task.id}]: ${task.resourceName}，cron表达式: ${task.cronExpression}`);
+                    try {
+                        const result = await taskService.processTask(task);
+                        if (result) {
+                            messageUtil.sendMessage(result);
+                        }
+                    } catch (error) {
+                        console.error(`自定义任务${task.id}执行失败:`, error);
+                    }
+                }, {
+                    scheduled: true,
+                    timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
+                });
+                
+                taskSchedulers.set(task.id, scheduler);
+                console.log(`已为任务[${task.id}]创建自定义定时任务，cron表达式: ${task.cronExpression}`);
+            } catch (error) {
+                console.error(`为任务${task.id}创建自定义定时任务失败:`, error);
+            }
+        }
+    };
+    
+    // 初始化自定义定时任务
+    const initCustomTaskSchedulers = async () => {
+        console.log('初始化自定义定时任务...');
+        const tasks = await taskService.getPendingTasks();
+        const customTasks = tasks.filter(task => task.cronExpression);
+        console.log(`找到${customTasks.length}个使用自定义定时任务的待处理任务`);
+        
+        customTasks.forEach(task => {
+            createOrUpdateTaskScheduler(task);
+        });
+    };
+    
+    // 修改任务更新API，处理cron表达式变更
     app.put('/api/tasks/:id', async (req, res) => {
         try {
             const taskId = parseInt(req.params.id);
@@ -432,14 +475,16 @@ AppDataSource.initialize().then(() => {
             const { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, shareFolderId, targetFolderName, 
-                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
+                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords,
+                cronExpression 
             } = req.body;
             
             // 如果shareFolderId为"root",则获取原任务的shareFileId
             let updates = { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, targetFolderName, 
-                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords 
+                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords,
+                cronExpression 
             };
 
             if(shareFolderId === "root") {
@@ -459,9 +504,32 @@ AppDataSource.initialize().then(() => {
             const updatedTask = await taskService.updateTask(taskId, updates);
             // console.log('更新后的任务:', updatedTask);
             
+            // 处理定时任务更新
+            createOrUpdateTaskScheduler(updatedTask);
+            
             res.json({ success: true, data: updatedTask });
         } catch (error) {
             console.error('更新任务失败:', error);
+            res.json({ success: false, error: error.message });
+        }
+    });
+    
+    // 任务删除时也需要停止定时任务
+    app.delete('/api/tasks/:id', async (req, res) => {
+        try {
+            const taskId = parseInt(req.params.id);
+            
+            // 如果有定时任务，先停止
+            if (taskSchedulers.has(taskId)) {
+                const scheduler = taskSchedulers.get(taskId);
+                scheduler.stop();
+                taskSchedulers.delete(taskId);
+                console.log(`已停止并删除任务[${taskId}]的定时任务`);
+            }
+            
+            await taskService.deleteTask(taskId);
+            res.json({ success: true });
+        } catch (error) {
             res.json({ success: false, error: error.message });
         }
     });
@@ -472,7 +540,7 @@ AppDataSource.initialize().then(() => {
             if (!task) throw new Error('任务不存在');
             const result = await taskService.processTask(task);
             if (result) {
-                messageUtil.sendMessage(result)
+                messageUtil.sendMessage(result);
             }
             res.json({ success: true, data: result });
         } catch (error) {
@@ -480,8 +548,8 @@ AppDataSource.initialize().then(() => {
         }
     });
 
-     // 获取目录树
-     app.get('/api/folders/:accountId', async (req, res) => {
+    // 获取目录树
+    app.get('/api/folders/:accountId', async (req, res) => {
         try {
             const accountId = parseInt(req.params.accountId);
             const folderId = req.query.folderId || '-11';
@@ -585,7 +653,7 @@ AppDataSource.initialize().then(() => {
             throw new Error('账号不存在');
         }
         const cloud189 = Cloud189Service.getInstance(account);
-        const fileList =  await taskService.getAllFolderFiles(cloud189, folderId);
+        const fileList = await taskService.getAllFolderFiles(cloud189, folderId);
         res.json({ success: true, data: fileList });
     });
     app.post('/api/files/rename', async (req, res) => {
@@ -744,30 +812,41 @@ AppDataSource.initialize().then(() => {
         }
     });
 
-    // 启动定时任务
+    // 启动全局定时任务
     cron.schedule(process.env.TASK_CHECK_INTERVAL, async () => {
-        console.log('执行定时任务检查...');
+        console.log('执行全局定时任务检查...');
         const tasks = await taskService.getPendingTasks();
-        let saveResults = []
-        for (const task of tasks) {
+        let saveResults = [];
+        
+        // 只处理没有自定义cron表达式的任务
+        const defaultTasks = tasks.filter(task => !task.cronExpression);
+        console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
+        
+        for (const task of defaultTasks) {
             try {
-            result = await taskService.processTask(task);
-            if (result) {
-                saveResults.push(result)
-            }
+                const result = await taskService.processTask(task);
+                if (result) {
+                    saveResults.push(result);
+                }
             } catch (error) {
                 console.error(`任务${task.id}执行失败:`, error);
             }
         }
+        
         if (saveResults.length > 0) {
-            messageUtil.sendMessage(saveResults.join("\n\n"))
+            messageUtil.sendMessage(saveResults.join("\n\n"));
         }
+    }, {
+        scheduled: true,
+        timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
     });
-
+    
     // 启动服务器
     const port = process.env.PORT || 3000;
-    app.listen(port, () => {
+    app.listen(port, async () => {
         console.log(`服务器运行在 http://0.0.0.0:${port}`);
+        // 初始化自定义定时任务
+        await initCustomTaskSchedulers();
     });
 }).catch(error => {
     console.error('数据库连接失败:', error);
