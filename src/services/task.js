@@ -2,13 +2,17 @@ const { Cloud189Service } = require('./cloud189');
 const { MessageUtil } = require('./message');
 
 class TaskService {
-    constructor(taskRepo, accountRepo, taskLogRepo) {
+    constructor(taskRepo, accountRepo, taskLogRepo, configService) {
         this.taskRepo = taskRepo;
         this.accountRepo = accountRepo;
         this.taskLogRepo = taskLogRepo;
         this.messageUtil = new MessageUtil();
-        this.taskExpireDays = parseInt(process.env.TASK_EXPIRE_DAYS || '3');
+        this.configService = configService;
+        this.taskExpireDays = 10; // 默认值
 
+        // 从配置服务加载过期天数
+        this.loadConfig();
+        
         // 默认的集数匹配正则表达式
         this.defaultEpisodeRegex = [
             /[Ss]\d+[Ee](\d+)/,    // S01E01 格式，只提取E后面的集数
@@ -17,6 +21,15 @@ class TaskService {
             /\.E(\d+)\./i,         // .E01. 格式
             /[\[\(](\d+)[\]\)]/    // [01] 或 (01) 格式
         ];
+    }
+
+    // 加载配置
+    async loadConfig() {
+        if (this.configService) {
+            const expireDays = await this.configService.getConfigValue('TASK_EXPIRE_DAYS', '3');
+            this.taskExpireDays = parseInt(expireDays);
+            console.log(`任务过期天数配置加载完成: ${this.taskExpireDays}天`);
+        }
     }
 
     // 从文件名中提取集数

@@ -121,6 +121,24 @@ export class TaskLog {
     createdAt!: Date;
 }
 
+@Entity()
+export class SystemConfig {
+    @PrimaryColumn()
+    key!: string;
+
+    @Column('text')
+    value!: string;
+
+    @Column({ nullable: true })
+    description?: string;
+
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @UpdateDateColumn()
+    updatedAt!: Date;
+}
+
 @Entity('sessions')
 export class Session implements ISession {
     @PrimaryColumn('varchar')

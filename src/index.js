@@ -6,12 +6,13 @@ const session = require('express-session');
 const fs = require('fs').promises;
 const path = require('path');
 const { AppDataSource } = require('./database');
-const { Account, Task, TaskLog, Session } = require('./entities');
+const { Account, Task, TaskLog, Session, SystemConfig } = require('./entities');
 const { TaskService } = require('./services/task');
 const { Cloud189Service } = require('./services/cloud189');
 const { MessageUtil } = require('./services/message');
 const { CacheManager } = require('./services/CacheManager');
 const { CustomSessionStore } = require('./services/SessionStore');
+const { ConfigService } = require('./services/config');
 const cryptoUtil = require('./utils/crypto');
 const crypto = require('crypto');
 
@@ -39,15 +40,24 @@ const authMiddleware = (req, res, next) => {
 };
 
 // 初始化数据库连接
-AppDataSource.initialize().then(() => {
+AppDataSource.initialize().then(async () => {
     console.log('数据库连接成功');
     const accountRepo = AppDataSource.getRepository(Account);
     const taskRepo = AppDataSource.getRepository(Task);
     const taskLogRepo = AppDataSource.getRepository(TaskLog);
-    const taskService = new TaskService(taskRepo, accountRepo, taskLogRepo);
+    const configRepo = AppDataSource.getRepository(SystemConfig);
+    
+    // 初始化配置服务
+    const configService = new ConfigService(configRepo);
+    await configService.initDefaultConfig();
+    
+    // 初始化任务服务，传入配置服务
+    const taskService = new TaskService(taskRepo, accountRepo, taskLogRepo, configService);
     const messageUtil = new MessageUtil();
+    
     // 初始化缓存管理器
-    const folderCache = new CacheManager(parseInt(process.env.FOLDER_CACHE_TTL || 600));
+    const folderCacheTTL = await configService.getConfigValue('FOLDER_CACHE_TTL', '600');
+    const folderCache = new CacheManager(parseInt(folderCacheTTL));
 
     // 初始化session存储
     const sessionRepository = AppDataSource.getRepository(Session);
@@ -56,7 +66,7 @@ AppDataSource.initialize().then(() => {
     // 配置session中间件
     app.use(session({
         name: 'cloud189.sid',
-        secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+        secret: await configService.getConfigValue('SESSION_SECRET'),
         resave: false,
         saveUninitialized: false,
         rolling: true,
@@ -64,7 +74,7 @@ AppDataSource.initialize().then(() => {
         cookie: {
             secure: process.env.NODE_ENV === 'production',
             httpOnly: true,
-            maxAge: 86400000, // 24小时
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30天
             sameSite: 'lax'
         }
     }));
@@ -164,15 +174,19 @@ AppDataSource.initialize().then(() => {
             });
         }
 
+        // 获取配置中的用户名和密码
+        const configUsername = await configService.getConfigValue('AUTH_USERNAME');
+        const configPassword = await configService.getConfigValue('AUTH_PASSWORD');
+
         // 在服务器端计算预期的密码哈希
         const expectedHash = cryptoUtil.hashChallengePassword(
-            process.env.AUTH_PASSWORD, 
+            configPassword, 
             salt, 
             timestamp
         );
         
         // 验证用户名和密码
-        if (username === process.env.AUTH_USERNAME && password === expectedHash) {
+        if (username === configUsername && password === expectedHash) {
             // 设置session
             req.session.user = {
                 username,
@@ -182,6 +196,9 @@ AppDataSource.initialize().then(() => {
             // 如果选择了记住登录,延长cookie过期时间
             if (remember) {
                 req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30天
+            } else {
+                // 未选择记住登录时，使用默认的过期时间
+                req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 * 24小时
             }
 
             // 清除挑战信息
@@ -414,6 +431,76 @@ AppDataSource.initialize().then(() => {
 
     // 存储定时任务的映射关系，方便后续更新或删除
     const taskSchedulers = new Map();
+    // 存储全局定时任务
+    let globalTaskScheduler = null;
+    
+    // 系统设置相关API
+    app.get('/api/system/config', async (req, res) => {
+        try {
+            // 从配置服务获取所有系统设置
+            const configs = await configService.getAllConfigs();
+            // 敏感信息处理
+            const safeConfigs = configs.map(config => {
+                // 如果是AUTH_PASSWORD，不返回具体值
+                if (config.key === 'AUTH_PASSWORD') {
+                    return {
+                        ...config,
+                        value: '********' // 替换为星号
+                    };
+                }
+                return config;
+            });
+            
+            res.json({ success: true, data: safeConfigs });
+        } catch (error) {
+            console.error('获取系统设置失败:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
+    // 设置全局定时任务
+    const setupGlobalTaskScheduler = async () => {
+        // 如果已存在全局定时任务，先停止
+        if (globalTaskScheduler) {
+            globalTaskScheduler.stop();
+            console.log('已停止旧的全局定时任务');
+        }
+        
+        // 从数据库获取定时任务表达式
+        const taskCheckInterval = await configService.getConfigValue('TASK_CHECK_INTERVAL', '0 */30 * * * *');
+        console.log(`设置全局定时任务，表达式: ${taskCheckInterval}`);
+        
+        // 创建新的全局定时任务
+        globalTaskScheduler = cron.schedule(taskCheckInterval, async () => {
+            console.log('执行全局定时任务检查...');
+            const tasks = await taskService.getPendingTasks();
+            let saveResults = [];
+            
+            // 只处理没有自定义cron表达式的任务
+            const defaultTasks = tasks.filter(task => !task.cronExpression);
+            console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
+            
+            for (const task of defaultTasks) {
+                try {
+                    const result = await taskService.processTask(task);
+                    if (result) {
+                        saveResults.push(result);
+                    }
+                } catch (error) {
+                    console.error(`任务${task.id}执行失败:`, error);
+                }
+            }
+            
+            if (saveResults.length > 0) {
+                messageUtil.sendMessage(saveResults.join("\n\n"));
+            }
+        }, {
+            scheduled: true,
+            timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
+        });
+        
+        return globalTaskScheduler;
+    };
 
     // 为任务创建或更新定时任务
     const createOrUpdateTaskScheduler = (task) => {
@@ -812,39 +899,116 @@ AppDataSource.initialize().then(() => {
         }
     });
 
-    // 启动全局定时任务
-    cron.schedule(process.env.TASK_CHECK_INTERVAL, async () => {
-        console.log('执行全局定时任务检查...');
-        const tasks = await taskService.getPendingTasks();
-        let saveResults = [];
-        
-        // 只处理没有自定义cron表达式的任务
-        const defaultTasks = tasks.filter(task => !task.cronExpression);
-        console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
-        
-        for (const task of defaultTasks) {
-            try {
-                const result = await taskService.processTask(task);
-                if (result) {
-                    saveResults.push(result);
-                }
-            } catch (error) {
-                console.error(`任务${task.id}执行失败:`, error);
+    // 修改系统设置API，处理配置变更
+    app.post('/api/system/config', async (req, res) => {
+        try {
+            console.log('收到系统设置更新请求:', req.body)
+            const { configs } = req.body;
+            if (!Array.isArray(configs)) {
+                return res.status(400).json({ success: false, error: '无效的配置数据格式' });
             }
+            
+            // 标记是否需要重新设置全局定时任务
+            let needResetGlobalScheduler = false;
+            let needReloadTaskExpireDays = false;
+            
+            // 保存配置到数据库
+            for (const config of configs) {
+                // 处理密码加密
+                if (config.key === 'AUTH_PASSWORD' && config.value !== '********') {
+                    // 如果包含加密信息，则需要解密
+                    if (config.encryptionData) {
+                        const { keyId, publicKey, timestamp } = config.encryptionData;
+                        
+                        // 验证加密密钥是否有效
+                        const keyInfo = req.session.encryptionKeys && req.session.encryptionKeys[keyId];
+                        
+                        if (!keyInfo || keyInfo.expires < Date.now()) {
+                            return res.status(400).json({ 
+                                success: false, 
+                                error: '加密密钥无效或已过期' 
+                            });
+                        }
+                        
+                        // 使用临时公钥解密
+                        try {
+                            const decryptedPassword = cryptoUtil.aesDecrypt(config.value, keyInfo.publicKey);
+                            // 使用解密后的明文密码更新配置
+                            await configService.setConfig(config.key, decryptedPassword, config.description);
+                            
+                            // 清除已使用的加密密钥
+                            delete req.session.encryptionKeys[keyId];
+                        } catch (e) {
+                            console.error('密码解密失败:', e);
+                            return res.status(400).json({ 
+                                success: false, 
+                                error: '密码解密失败' 
+                            });
+                        }
+                    } else {
+                        // 如果没有加密信息，直接保存（明文）
+                        await configService.setConfig(config.key, config.value, config.description);
+                    }
+                } else {
+                    // 其他配置正常保存
+                    await configService.setConfig(config.key, config.value, config.description);
+                }
+                
+                // 检查是否修改了关键配置
+                if (config.key === 'TASK_CHECK_INTERVAL') {
+                    needResetGlobalScheduler = true;
+                } else if (config.key === 'TASK_EXPIRE_DAYS') {
+                    needReloadTaskExpireDays = true;
+                }
+            }
+            
+            // 更新缓存过期时间
+            const newFolderCacheTTL = configs.find(c => c.key === 'FOLDER_CACHE_TTL')?.value;
+            if (newFolderCacheTTL) {
+                folderCache.setTTL(parseInt(newFolderCacheTTL));
+            }
+            
+            // 重新初始化定时任务
+            if (needResetGlobalScheduler) {
+                await setupGlobalTaskScheduler();
+            }
+            
+            // 重新加载任务过期天数
+            if (needReloadTaskExpireDays) {
+                await taskService.loadConfig();
+            }
+            
+            res.json({ success: true });
+        } catch (error) {
+            console.error('更新系统设置失败:', error);
+            res.status(500).json({ success: false, error: error.message });
         }
-        
-        if (saveResults.length > 0) {
-            messageUtil.sendMessage(saveResults.join("\n\n"));
-        }
-    }, {
-        scheduled: true,
-        timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
     });
-    
+
+    // 验证当前密码API
+    app.post('/api/system/verify-password', async (req, res) => {
+        try {
+            const { currentPassword } = req.body;
+            const storedPassword = await configService.getConfigValue('AUTH_PASSWORD');
+            
+            // 验证密码是否正确
+            if (currentPassword === storedPassword) {
+                res.json({ success: true });
+            } else {
+                res.json({ success: false, error: '当前密码不正确' });
+            }
+        } catch (error) {
+            console.error('验证密码失败:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
     // 启动服务器
     const port = process.env.PORT || 3000;
     app.listen(port, async () => {
         console.log(`服务器运行在 http://0.0.0.0:${port}`);
+        // 设置全局定时任务
+        await setupGlobalTaskScheduler();
         // 初始化自定义定时任务
         await initCustomTaskSchedulers();
     });

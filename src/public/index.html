@@ -42,6 +42,7 @@
             <div class="tab active" data-tab="task">任务管理</div>
             <div class="tab" data-tab="notification">通知配置</div>
             <div class="tab" data-tab="logs">更新记录</div>
+            <div class="tab" data-tab="system">系统设置</div>
         </div>
 
         <div id="accountTab" class="tab-content">
@@ -222,6 +223,46 @@
                 </table>
             </div>
         </div>
+
+        <div id="systemTab" class="tab-content">
+            <div class="system-config">
+                <form id="systemConfigForm">
+                    <h3>系统用户设置</h3>
+                    <div class="form-group">
+                        <label for="authUsername">管理员用户名</label>
+                        <input type="text" id="authUsername" name="AUTH_USERNAME" placeholder="系统管理员用户名">
+                    </div>
+                    <div class="form-group">
+                        <label for="authPassword">管理员密码</label>
+                        <input type="password" id="authPassword" name="AUTH_PASSWORD" placeholder="留空则不修改密码">
+                    </div>
+                    
+                    <h3>定时任务设置</h3>
+                    <div class="form-group">
+                        <label for="taskCheckInterval">全局定时任务表达式</label>
+                        <input type="text" id="taskCheckInterval" name="TASK_CHECK_INTERVAL" placeholder="Cron表达式，例如：0 */30 * * * *">
+                        <small>默认为每30分钟执行一次：0 */30 * * * *</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskExpireDays">任务过期天数</label>
+                        <input type="number" id="taskExpireDays" name="TASK_EXPIRE_DAYS" placeholder="任务过期天数">
+                        <small>超过指定天数未更新的任务将被视为过期</small>
+                    </div>
+                    
+                    <h3>缓存设置</h3>
+                    <div class="form-group">
+                        <label for="folderCacheTTL">文件目录缓存时间（秒）</label>
+                        <input type="number" id="folderCacheTTL" name="FOLDER_CACHE_TTL" placeholder="文件目录缓存时间（秒）">
+                        <small>目录缓存过期时间，默认600秒（10分钟）</small>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit">保存配置</button>
+                        <button type="reset">重置</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
 <!-- 在 body 结束标签前添加以下脚本引用 -->
@@ -235,6 +276,7 @@
 <script src="/js/toast.js"></script>
 <script src="/js/folder-tree.js"></script>
 <script src="/js/notification.js"></script>
+<script src="/js/system.js"></script>
 
 <script>
 // 源目录选择器
