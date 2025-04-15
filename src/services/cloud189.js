@@ -128,6 +128,16 @@ class Cloud189Service {
         return response;
     }
 
+     // 创建批量执行任务 跟这个createSaveTask方法一样，处理方式不一样，但是功能一样
+    async createBatchTask(batchTaskDto) {
+        logTaskEvent("创建批量任务")
+        logTaskEvent(`batchTaskDto: ${batchTaskDto.toString()}`)
+        return await this.request('https://cloud.189.cn/api/open/batch/createBatchTask.action', {
+            method: 'POST',
+            form: batchTaskDto
+        })
+    }
+
     // 查询转存任务状态
     async checkTaskStatus(taskId) {
         const params = {taskId: taskId, type: 'SHARE_SAVE'}
@@ -264,6 +274,21 @@ class Cloud189Service {
             console.error('保存分享文件失败:', e);
             throw e;
         }
+    }
+
+    // 获取家庭信息
+    async getFamilyInfo() {
+        const familyList = await this.client.getFamilyList()
+        if (!familyList || !familyList.familyInfoResp) {
+            return null
+        }
+        const resp = familyList.familyInfoResp
+        for (const family of resp) {
+            if (family.userRole == 1) {
+                return family
+            }
+        }
+        return null
     }
 }
 

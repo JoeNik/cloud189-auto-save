@@ -9,7 +9,10 @@ class ConfigService {
             { key: 'SESSION_SECRET', value: crypto.randomBytes(32).toString('hex'), description: '会话加密密钥' },
             { key: 'TASK_CHECK_INTERVAL', value: '0 */30 * * * *', description: '全局定时任务执行间隔（Cron表达式）' },
             { key: 'TASK_EXPIRE_DAYS', value: '3', description: '任务过期天数' },
-            { key: 'FOLDER_CACHE_TTL', value: '600', description: '文件目录缓存时间（秒）' }
+            { key: 'FOLDER_CACHE_TTL', value: '600', description: '文件目录缓存时间（秒）' },
+            { key: 'CLEAR_RECYCLE_INTERVAL', value: '0 2 * * * *', description: '清空回收站定时任务执行间隔（Cron表达式）' },
+            { key: 'ENABLE_AUTO_CLEAR_RECYCLE', value: '0', description: '清理个人空间(0:不清理 1:清理)' },
+            { key: 'ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', value: '0', description: '清理家庭空间(0:不清理 1:清理)' }
         ];
     }
 

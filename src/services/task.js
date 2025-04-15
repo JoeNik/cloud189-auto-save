@@ -26,7 +26,7 @@ class TaskService {
     // 加载配置
     async loadConfig() {
         if (this.configService) {
-            const expireDays = await this.configService.getConfigValue('TASK_EXPIRE_DAYS', '3');
+            const expireDays = await this.configService.getConfigValue('TASK_EXPIRE_DAYS', '10');
             this.taskExpireDays = parseInt(expireDays);
             console.log(`任务过期天数配置加载完成: ${this.taskExpireDays}天`);
         }
@@ -557,6 +557,66 @@ class TaskService {
             return await this.checkTaskStatus(cloud189, taskId, count++)
         }
         return false;
+    }
+
+     // 创建批量任务
+     async createBatchTask(cloud189, batchTaskDto) {
+        const resp = await cloud189.createBatchTask(batchTaskDto);
+        if (!resp) {
+            throw new Error('批量任务处理失败');
+        }
+        if (resp.res_code != 0) {
+            throw new Error(resp.res_msg);
+        }
+        logTaskEvent(`批量任务处理中: ${JSON.stringify(resp)}`)
+        if (!await this.checkTaskStatus(cloud189,resp.taskId, 0 , batchTaskDto.type)) {
+            throw new Error('检查批量任务状态: 批量任务处理失败');
+        }
+        logTaskEvent(`批量任务处理完成`)
+    }
+
+     // 定时清空回收站
+     async clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle) {
+        const accounts = await this.accountRepo.find()
+        if (accounts) {
+            for (const account of accounts) {
+                let username = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
+                try {
+                    const cloud189 = Cloud189Service.getInstance(account); 
+                    await this._clearRecycleBin(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle)
+                } catch (error) {
+                    logTaskEvent(`定时[${username}]清空回收站任务执行失败:${error.message}`);
+                }
+            }
+        }
+    }
+
+    // 执行清空回收站
+    async _clearRecycleBin(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle) {
+        const params = {
+            taskInfos: '[]',
+            type: 'EMPTY_RECYCLE',
+        }   
+        const batchTaskDto = new BatchTaskDto(params);
+        if (enableAutoClearRecycle) {
+            logTaskEvent(`开始清空[${username}]个人回收站`)
+            await this.createBatchTask(cloud189, batchTaskDto)
+            logTaskEvent(`清空[${username}]个人回收站完成`)
+            // 延迟10秒
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+        if (enableAutoClearFamilyRecycle) {
+            // 获取家庭id
+            const familyInfo = await cloud189.getFamilyInfo()
+            if (familyInfo == null) {
+                logTaskEvent(`用户${username}没有家庭主账号, 跳过`)
+                return
+            }
+            logTaskEvent(`开始清空[${username}]家庭回收站`)
+            batchTaskDto.familyId = familyInfo.familyId
+            await this.createBatchTask(cloud189, batchTaskDto)
+            logTaskEvent(`清空[${username}]家庭回收站完成`)
+        }
     }
 }
 

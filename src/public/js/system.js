@@ -15,7 +15,15 @@ async function loadSystemConfig() {
             systemConfigs.forEach(config => {
                 const input = form.querySelector(`[name="${config.key}"]`);
                 if (input) {
-                    input.value = config.value;
+                    if (input.type === 'checkbox') {
+                        // 处理复选框
+                        input.checked = config.value === '1' || config.value === 'true';
+                        // 更新复选框的值
+                        input.value = input.checked ? '1' : '0';
+                    } else {
+                        // 处理其他输入框
+                        input.value = config.value;
+                    }
                 }
             });
         } else {
@@ -24,6 +32,51 @@ async function loadSystemConfig() {
     } catch (error) {
         console.error('加载系统配置出错：', error);
         toast.error('加载系统配置失败：' + error.message);
+    }
+}
+
+// 切换个人回收站清理开关
+function toggleRecycle(checkbox) {
+    console.log('切换个人回收站清理开关：', checkbox.checked);
+    // 复选框的value值会根据是否选中改变
+    checkbox.value = checkbox.checked ? '1' : '0';
+    // 显示提示信息
+    if (checkbox.checked) {
+        toast.info('已启用个人回收站自动清理');
+    } else {
+        toast.info('已禁用个人回收站自动清理');
+    }
+}
+
+// 切换家庭回收站清理开关
+function toggleFamilyRecycle(checkbox) {
+    console.log('切换家庭回收站清理开关：', checkbox.checked);
+    // 复选框的value值会根据是否选中改变
+    checkbox.value = checkbox.checked ? '1' : '0';
+    // 显示提示信息
+    if (checkbox.checked) {
+        toast.info('已启用家庭回收站自动清理');
+    } else {
+        toast.info('已禁用家庭回收站自动清理');
+    }
+}
+
+// 为复选框添加事件监听器
+function setupCheckboxListeners() {
+    // 个人回收站复选框
+    const recycleCheckbox = document.getElementById('Enable_Auto_Clear_Recycle');
+    if (recycleCheckbox) {
+        recycleCheckbox.addEventListener('change', function() {
+            toggleRecycle(this);
+        });
+    }
+    
+    // 家庭回收站复选框
+    const familyRecycleCheckbox = document.getElementById('Enable_Auto_Clear_Family_Recycle');
+    if (familyRecycleCheckbox) {
+        familyRecycleCheckbox.addEventListener('change', function() {
+            toggleFamilyRecycle(this);
+        });
     }
 }
 
@@ -118,6 +171,8 @@ function initSystemConfig() {
     if (form) {
         form.addEventListener('submit', saveSystemConfig);
         loadSystemConfig();
+        // 设置复选框事件监听器
+        setupCheckboxListeners();
     }
 }
 

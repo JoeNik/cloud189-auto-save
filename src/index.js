@@ -16,6 +16,9 @@ const { ConfigService } = require('./services/config');
 const cryptoUtil = require('./utils/crypto');
 const crypto = require('crypto');
 
+// 为了便于验证cron表达式的有效性
+const validateCron = cron.validate;
+
 const app = express();
 app.use(express.json());
 app.use(express.static('src/public'));
@@ -434,6 +437,9 @@ AppDataSource.initialize().then(async () => {
     // 存储全局定时任务
     let globalTaskScheduler = null;
     
+    // 存储清理任务的定时器
+    let globalClearRecycleScheduler = null;
+    
     // 系统设置相关API
     app.get('/api/system/config', async (req, res) => {
         try {
@@ -447,6 +453,11 @@ AppDataSource.initialize().then(async () => {
                         ...config,
                         value: '********' // 替换为星号
                     };
+                }else if (config.key === 'SESSION_SECRET') {
+                    return {
+                       ...config,
+                        value: '' // 隐藏值
+                    };
                 }
                 return config;
             });
@@ -458,6 +469,57 @@ AppDataSource.initialize().then(async () => {
         }
     });
 
+    // 设置定时清理回收站任务
+    const setupClearRecycleTaskScheduler = async()=>{
+       
+        // 如果已存在全局定时任务，先停止
+        if (globalClearRecycleScheduler) {
+            globalClearRecycleScheduler.stop();
+            console.log('已停止旧的清理回收站定时任务');
+        }
+
+        // 从配置中获取定时表达式，确保是有效的cron表达式
+        let clearRecycleInterval = await configService.getConfigValue('CLEAR_RECYCLE_INTERVAL', '0 0 2 * * *'); // 每天2点执行
+        // 验证cron表达式是否有效，无效则使用默认值
+        try {
+            // 简单验证cron表达式格式
+            if (!clearRecycleInterval || 
+                !clearRecycleInterval.trim() || 
+                clearRecycleInterval.split(' ').length < 6) {
+                console.warn('无效的清理回收站cron表达式，使用默认值');
+                clearRecycleInterval = '0 0 2 * * *'; // 使用默认值
+            }
+            // 测试cron表达式是否可以解析
+            validateCron(clearRecycleInterval);
+        } catch (error) {
+            console.error('清理回收站cron表达式无效，使用默认值', error);
+            clearRecycleInterval = '0 0 2 * * *'; // 使用默认值
+        }
+        
+        const enableAutoClearRecycle = await configService.getConfigValue('ENABLE_AUTO_CLEAR_RECYCLE', '0'); 
+        const enableAutoClearFamilyRecycle = await configService.getConfigValue('ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', '0');
+        console.log(`设置定时清理回收站任务: ${clearRecycleInterval}, 自动清理回收站: ${enableAutoClearRecycle}, 自动清理家庭回收站: ${enableAutoClearFamilyRecycle}`);
+
+        try {
+            // 创建新的定时任务
+            globalClearRecycleScheduler = cron.schedule(clearRecycleInterval, async () => {
+                console.log('执行定时清理回收站任务...');
+                try {
+                    taskService.clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle);
+                } catch (error) {
+                    console.error('定时清理回收站任务执行失败:', error); 
+                } 
+            });
+            console.log('定时清理回收站任务设置成功');
+        } catch (error) {
+            console.error('设置定时清理回收站任务失败:', error);
+            // 设置失败时返回null，不影响主程序运行
+            return null;
+        }
+
+        return globalClearRecycleScheduler;
+    };
+
     // 设置全局定时任务
     const setupGlobalTaskScheduler = async () => {
         // 如果已存在全局定时任务，先停止
@@ -467,37 +529,62 @@ AppDataSource.initialize().then(async () => {
         }
         
         // 从数据库获取定时任务表达式
-        const taskCheckInterval = await configService.getConfigValue('TASK_CHECK_INTERVAL', '0 */30 * * * *');
+        let taskCheckInterval = await configService.getConfigValue('TASK_CHECK_INTERVAL', '0 */30 * * * *');
+        
+        // 验证cron表达式是否有效，无效则使用默认值
+        try {
+            // 简单验证cron表达式格式
+            if (!taskCheckInterval || 
+                !taskCheckInterval.trim() || 
+                taskCheckInterval.split(' ').length < 6) {
+                console.warn('无效的全局任务cron表达式，使用默认值');
+                taskCheckInterval = '0 */30 * * * *'; // 使用默认值
+            }
+            // 测试cron表达式是否可以解析
+            validateCron(taskCheckInterval);
+        } catch (error) {
+            console.error('全局任务cron表达式无效，使用默认值', error);
+            taskCheckInterval = '0 */30 * * * *'; // 使用默认值
+        }
+        
         console.log(`设置全局定时任务，表达式: ${taskCheckInterval}`);
         
-        // 创建新的全局定时任务
-        globalTaskScheduler = cron.schedule(taskCheckInterval, async () => {
-            console.log('执行全局定时任务检查...');
-            const tasks = await taskService.getPendingTasks();
-            let saveResults = [];
-            
-            // 只处理没有自定义cron表达式的任务
-            const defaultTasks = tasks.filter(task => !task.cronExpression);
-            console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
-            
-            for (const task of defaultTasks) {
-                try {
-                    const result = await taskService.processTask(task);
-                    if (result) {
-                        saveResults.push(result);
+        try {
+            // 创建新的全局定时任务
+            globalTaskScheduler = cron.schedule(taskCheckInterval, async () => {
+                console.log('执行全局定时任务检查...');
+                const tasks = await taskService.getPendingTasks();
+                let saveResults = [];
+                
+                // 只处理没有自定义cron表达式的任务
+                const defaultTasks = tasks.filter(task => !task.cronExpression);
+                console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
+                
+                for (const task of defaultTasks) {
+                    try {
+                        const result = await taskService.processTask(task);
+                        if (result) {
+                            saveResults.push(result);
+                        }
+                    } catch (error) {
+                        console.error(`任务${task.id}执行失败:`, error);
                     }
-                } catch (error) {
-                    console.error(`任务${task.id}执行失败:`, error);
                 }
-            }
+                
+                if (saveResults.length > 0) {
+                    messageUtil.sendMessage(saveResults.join("\n\n"));
+                }
+            }, {
+                scheduled: true,
+                timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
+            });
             
-            if (saveResults.length > 0) {
-                messageUtil.sendMessage(saveResults.join("\n\n"));
-            }
-        }, {
-            scheduled: true,
-            timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
-        });
+            console.log('全局定时任务设置成功');
+        } catch (error) {
+            console.error('设置全局定时任务失败:', error);
+            // 设置失败时返回null，不影响主程序运行
+            return null;
+        }
         
         return globalTaskScheduler;
     };
@@ -515,6 +602,17 @@ AppDataSource.initialize().then(async () => {
         // 如果任务有自定义cron表达式，创建新的定时任务
         if (task.cronExpression) {
             try {
+                // 验证cron表达式是否有效
+                if (!task.cronExpression || 
+                    !task.cronExpression.trim() || 
+                    task.cronExpression.split(' ').length < 6) {
+                    console.warn(`任务[${task.id}]的cron表达式无效: ${task.cronExpression}`);
+                    return;
+                }
+                
+                // 测试cron表达式是否可以解析
+                validateCron(task.cronExpression);
+                
                 const scheduler = cron.schedule(task.cronExpression, async () => {
                     console.log(`执行自定义定时任务[${task.id}]: ${task.resourceName}，cron表达式: ${task.cronExpression}`);
                     try {
@@ -534,6 +632,7 @@ AppDataSource.initialize().then(async () => {
                 console.log(`已为任务[${task.id}]创建自定义定时任务，cron表达式: ${task.cronExpression}`);
             } catch (error) {
                 console.error(`为任务${task.id}创建自定义定时任务失败:`, error);
+                // 出错时不影响其他任务的执行
             }
         }
     };
@@ -911,6 +1010,9 @@ AppDataSource.initialize().then(async () => {
             // 标记是否需要重新设置全局定时任务
             let needResetGlobalScheduler = false;
             let needReloadTaskExpireDays = false;
+
+            // 标记是否需要重新设置清空回收站任务
+            let needResetClearRecycleScheduler = false;
             
             // 保存配置到数据库
             for (const config of configs) {
@@ -960,6 +1062,11 @@ AppDataSource.initialize().then(async () => {
                 } else if (config.key === 'TASK_EXPIRE_DAYS') {
                     needReloadTaskExpireDays = true;
                 }
+
+                // 检查是否修改了清空回收站任务配置
+                if (config.key === 'CLEAR_RECYCLE_INTERVAL') {
+                    needResetClearRecycleScheduler = true;  
+                }
             }
             
             // 更新缓存过期时间
@@ -976,6 +1083,10 @@ AppDataSource.initialize().then(async () => {
             // 重新加载任务过期天数
             if (needReloadTaskExpireDays) {
                 await taskService.loadConfig();
+            }
+
+            if(needResetClearRecycleScheduler)  {
+                await setupClearRecycleTaskScheduler();
             }
             
             res.json({ success: true });
@@ -1011,6 +1122,8 @@ AppDataSource.initialize().then(async () => {
         await setupGlobalTaskScheduler();
         // 初始化自定义定时任务
         await initCustomTaskSchedulers();
+        // 设置清空回收站定时任务
+        await setupClearRecycleTaskScheduler();
     });
 }).catch(error => {
     console.error('数据库连接失败:', error);

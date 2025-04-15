@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/css/table.css">
     <link rel="stylesheet" href="/css/tabs.css">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/buttonMod.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script>
         // 简单的加密函数
@@ -255,6 +256,29 @@
                         <input type="number" id="folderCacheTTL" name="FOLDER_CACHE_TTL" placeholder="文件目录缓存时间（秒）">
                         <small>目录缓存过期时间，默认600秒（10分钟）</small>
                     </div>
+
+                    <div class="form-group">
+                        <label for="clearRecycleInterval">清空回收站定时任务表达式</label>
+                        <input type="text" id="clearRecycleInterval" name="CLEAR_RECYCLE_INTERVAL" placeholder="Cron表达式，例如：0 2 * * * *">
+                        <small>默认：0 2 * * * *</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>清空个人回收站</label>
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="Enable_Auto_Clear_Recycle"
+                                name="ENABLE_AUTO_CLEAR_RECYCLE" value="0">
+                            <label class="custom-control-label" for="Enable_Auto_Clear_Recycle">开关</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>清空家庭回收站</label>
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="Enable_Auto_Clear_Family_Recycle"
+                                name="ENABLE_AUTO_CLEAR_FAMILY_RECYCLE" value="0">
+                            <label class="custom-control-label" for="Enable_Auto_Clear_Family_Recycle">开关</label>
+                        </div>
+                    </div>
                     
                     <div class="form-actions">
                         <button type="submit">保存配置</button>
@@ -277,6 +301,7 @@
 <script src="/js/folder-tree.js"></script>
 <script src="/js/notification.js"></script>
 <script src="/js/system.js"></script>
+<script src="/js/buttonMod.js"></script>
 
 <script>
 // 源目录选择器
