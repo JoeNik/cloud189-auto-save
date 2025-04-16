@@ -404,11 +404,9 @@ AppDataSource.initialize().then(async () => {
             // 否则获取文件夹列表
             const account = await accountRepo.findOneBy({ id: accountId });
             if (!account) throw new Error('账号不存在');
-            
             const cloud189 = Cloud189Service.getInstance(account);
             const shareCode = await taskService.parseShareCode(shareLink);
             const shareInfo = await taskService.getShareInfo(cloud189, shareCode);
-            
             if (shareInfo.isFolder) {
                 const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, accessCode);
                 if (!result?.fileListAO?.folderList) {
