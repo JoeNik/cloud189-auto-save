@@ -130,12 +130,25 @@ class Cloud189Service {
 
      // 创建批量执行任务 跟这个createSaveTask方法一样，处理方式不一样，但是功能一样
     async createBatchTask(batchTaskDto) {
-        logTaskEvent("创建批量任务")
-        logTaskEvent(`batchTaskDto: ${batchTaskDto.toString()}`)
-        return await this.request('https://cloud.189.cn/api/open/batch/createBatchTask.action', {
+        console.log("创建批量任务")
+        console.log(`batchTaskDto: ${batchTaskDto.toString()}`)
+        const response = await this.client.request('https://cloud.189.cn/api/open/batch/createBatchTask.action', {
             method: 'POST',
-            form: batchTaskDto
-        })
+            form: batchTaskDto,
+            headers: {
+                'Accept': 'application/json;charset=UTF-8'
+            }
+        }).json();
+        
+        if (!response) {
+            throw new Error('创建批量任务失败：响应为空');
+        }
+        
+        if (response.res_code !== 0) {
+            throw new Error(`创建批量任务失败：${response.res_message || '未知错误'}`);
+        }
+        
+        return response;
     }
 
     // 查询转存任务状态

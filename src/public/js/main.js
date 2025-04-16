@@ -103,14 +103,14 @@ function showNotificationConfigModal() {
             if (data.success) {
                 const config = data.data;
                 // 加载现有配置
-                document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true';
+                document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true' || config.DINGTALK_ENABLED === '1';
                 document.getElementById('dingTalkToken').value = config.DINGTALK_WEBHOOK || '';
                 document.getElementById('dingTalkSecret').value = config.DINGTALK_SECRET || '';
                 
-                document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true';
+                document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true' || config.WECOM_ENABLED === '1';
                 document.getElementById('wecomWebhook').value = config.WECOM_WEBHOOK || '';
                 
-                document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true';
+                document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true' || config.TELEGRAM_ENABLED === '1';
                 document.getElementById('telegramBotToken').value = config.TELEGRAM_BOT_TOKEN || '';
                 document.getElementById('telegramChatId').value = config.TELEGRAM_CHAT_ID || '';
                 document.getElementById('cfProxyDomain').value = config.CF_PROXY_DOMAIN || '';
@@ -120,7 +120,7 @@ function showNotificationConfigModal() {
                 document.getElementById('proxyUsername').value = config.PROXY_USERNAME || '';
                 document.getElementById('proxyPassword').value = config.PROXY_PASSWORD || '';
                 
-                document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true';
+                document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true' || config.WXPUSHER_ENABLED === '1';
                 document.getElementById('wxPusherSpt').value = config.WXPUSHER_SPT || '';
             }
         });
@@ -166,16 +166,16 @@ async function loadNotificationConfig() {
             const config = data.data;
             
             // 钉钉配置
-            document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true';
+            document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true' || config.DINGTALK_ENABLED === '1';
             document.getElementById('dingTalkToken').value = config.DINGTALK_WEBHOOK || '';
             document.getElementById('dingTalkSecret').value = config.DINGTALK_SECRET || '';
             
             // 企业微信配置
-            document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true';
+            document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true' || config.WECOM_ENABLED === '1';
             document.getElementById('wecomWebhook').value = config.WECOM_WEBHOOK || '';
             
             // Telegram配置
-            document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true';
+            document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true' || config.TELEGRAM_ENABLED === '1';
             document.getElementById('telegramBotToken').value = config.TELEGRAM_BOT_TOKEN || '';
             document.getElementById('telegramChatId').value = config.TELEGRAM_CHAT_ID || '';
             document.getElementById('cfProxyDomain').value = config.CF_PROXY_DOMAIN || '';
@@ -186,12 +186,12 @@ async function loadNotificationConfig() {
             document.getElementById('proxyPassword').value = config.PROXY_PASSWORD || '';
             
             // WxPusher配置
-            document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true';
+            document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true' || config.WXPUSHER_ENABLED === '1';
             document.getElementById('wxPusherSpt').value = config.WXPUSHER_SPT || '';
         }
     } catch (error) {
         console.error('加载通知配置失败:', error);
-        alert('加载通知配置失败: ' + error.message);
+        toast.error('加载通知配置失败: ' + error.message);
     }
 }
 
@@ -259,14 +259,14 @@ function initNotificationConfig() {
         e.preventDefault();
         
         const config = {
-            DINGTALK_ENABLED: document.getElementById('dingTalkEnabled').checked.toString(),
+            DINGTALK_ENABLED: document.getElementById('dingTalkEnabled').checked ? '1' : '0',
             DINGTALK_WEBHOOK: document.getElementById('dingTalkToken').value,
             DINGTALK_SECRET: document.getElementById('dingTalkSecret').value,
             
-            WECOM_ENABLED: document.getElementById('wecomEnabled').checked.toString(),
+            WECOM_ENABLED: document.getElementById('wecomEnabled').checked ? '1' : '0',
             WECOM_WEBHOOK: document.getElementById('wecomWebhook').value,
             
-            TELEGRAM_ENABLED: document.getElementById('telegramEnabled').checked.toString(),
+            TELEGRAM_ENABLED: document.getElementById('telegramEnabled').checked ? '1' : '0',
             TELEGRAM_BOT_TOKEN: document.getElementById('telegramBotToken').value,
             TELEGRAM_CHAT_ID: document.getElementById('telegramChatId').value,
             CF_PROXY_DOMAIN: document.getElementById('cfProxyDomain').value,
@@ -276,7 +276,7 @@ function initNotificationConfig() {
             PROXY_USERNAME: document.getElementById('proxyUsername').value,
             PROXY_PASSWORD: document.getElementById('proxyPassword').value,
             
-            WXPUSHER_ENABLED: document.getElementById('wxPusherEnabled').checked.toString(),
+            WXPUSHER_ENABLED: document.getElementById('wxPusherEnabled').checked ? '1' : '0',
             WXPUSHER_SPT: document.getElementById('wxPusherSpt').value
         };
         
@@ -293,14 +293,14 @@ function initNotificationConfig() {
 
             const data = await response.json();
             if (data.success) {
-                console.log('配置保存成功',config);
-                alert('配置保存成功');
+                console.log('通知配置保存成功');
+                toast.success('通知配置已保存');
             } else {
                 throw new Error(data.error);
             }
         } catch (error) {
             console.error('保存通知配置失败:', error);
-            alert('保存通知配置失败: ' + error.message);
+            toast.error('保存通知配置失败: ' + error.message);
         }
     });
 }

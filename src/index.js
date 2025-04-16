@@ -6,7 +6,7 @@ const session = require('express-session');
 const fs = require('fs').promises;
 const path = require('path');
 const { AppDataSource } = require('./database');
-const { Account, Task, TaskLog, Session, SystemConfig } = require('./entities');
+const { Account, Task, TaskLog, Session, SystemConfig, NotificationConfig } = require('./entities');
 const { TaskService } = require('./services/task');
 const { Cloud189Service } = require('./services/cloud189');
 const { MessageUtil } = require('./services/message');
@@ -54,9 +54,12 @@ AppDataSource.initialize().then(async () => {
     const configService = new ConfigService(configRepo);
     await configService.initDefaultConfig();
     
+    // 初始化消息服务
+    const messageUtil = new MessageUtil();
+    await messageUtil.initialize();
+    
     // 初始化任务服务，传入配置服务
     const taskService = new TaskService(taskRepo, accountRepo, taskLogRepo, configService);
-    const messageUtil = new MessageUtil();
     
     // 初始化缓存管理器
     const folderCacheTTL = await configService.getConfigValue('FOLDER_CACHE_TTL', '600');
@@ -86,10 +89,10 @@ AppDataSource.initialize().then(async () => {
     app.use((req, res, next) => {
         const oldSave = req.session.save;
         req.session.save = function(cb) {
-            console.log('保存会话:', {
-                id: req.sessionID,
-                data: req.session
-            });
+            // console.log('保存会话:', {
+            //     id: req.sessionID,
+            //     data: req.session
+            // });
             return oldSave.call(req.session, function(err) {
                 if (err) {
                     console.error('会话保存错误:', err);
@@ -485,7 +488,7 @@ AppDataSource.initialize().then(async () => {
             // 简单验证cron表达式格式
             if (!clearRecycleInterval || 
                 !clearRecycleInterval.trim() || 
-                clearRecycleInterval.split(' ').length < 6) {
+                clearRecycleInterval.split(' ').length < 5) {
                 console.warn('无效的清理回收站cron表达式，使用默认值');
                 clearRecycleInterval = '0 0 2 * * *'; // 使用默认值
             }
@@ -505,10 +508,14 @@ AppDataSource.initialize().then(async () => {
             globalClearRecycleScheduler = cron.schedule(clearRecycleInterval, async () => {
                 console.log('执行定时清理回收站任务...');
                 try {
-                    taskService.clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle);
+                    // 使用 bind 确保 this 上下文正确
+                    await taskService.clearRecycleBin.bind(taskService)(enableAutoClearRecycle, enableAutoClearFamilyRecycle);
                 } catch (error) {
                     console.error('定时清理回收站任务执行失败:', error); 
                 } 
+            }, {
+                scheduled: true,
+                timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
             });
             console.log('定时清理回收站任务设置成功');
         } catch (error) {
@@ -536,7 +543,7 @@ AppDataSource.initialize().then(async () => {
             // 简单验证cron表达式格式
             if (!taskCheckInterval || 
                 !taskCheckInterval.trim() || 
-                taskCheckInterval.split(' ').length < 6) {
+                taskCheckInterval.split(' ').length < 5) {
                 console.warn('无效的全局任务cron表达式，使用默认值');
                 taskCheckInterval = '0 */30 * * * *'; // 使用默认值
             }
@@ -605,7 +612,7 @@ AppDataSource.initialize().then(async () => {
                 // 验证cron表达式是否有效
                 if (!task.cronExpression || 
                     !task.cronExpression.trim() || 
-                    task.cronExpression.split(' ').length < 6) {
+                    task.cronExpression.split(' ').length < 5) {
                     console.warn(`任务[${task.id}]的cron表达式无效: ${task.cronExpression}`);
                     return;
                 }
@@ -874,33 +881,49 @@ AppDataSource.initialize().then(async () => {
     // 获取通知配置
     app.get('/api/config/notification', async (req, res) => {
         try {
-            const config = {
+            // 从数据库加载通知配置信息
+            const notificationConfigs = [
                 // 钉钉配置
-                DINGTALK_ENABLED: process.env.DINGTALK_ENABLED || 'false',
-                DINGTALK_WEBHOOK: process.env.DINGTALK_WEBHOOK || '',
-                DINGTALK_SECRET: process.env.DINGTALK_SECRET || '',
+                'DINGTALK_ENABLED',
+                'DINGTALK_WEBHOOK',
+                'DINGTALK_SECRET',
                 
                 // 企业微信配置
-                WECOM_ENABLED: process.env.WECOM_ENABLED || 'false',
-                WECOM_WEBHOOK: process.env.WECOM_WEBHOOK || '',
+                'WECOM_ENABLED',
+                'WECOM_WEBHOOK',
                 
                 // Telegram配置
-                TELEGRAM_ENABLED: process.env.TELEGRAM_ENABLED || 'false',
-                TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
-                TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
-                CF_PROXY_DOMAIN: process.env.CF_PROXY_DOMAIN || '',
-                PROXY_TYPE: process.env.PROXY_TYPE || '',
-                PROXY_HOST: process.env.PROXY_HOST || '',
-                PROXY_PORT: process.env.PROXY_PORT || '',
-                PROXY_USERNAME: process.env.PROXY_USERNAME || '',
-                PROXY_PASSWORD: process.env.PROXY_PASSWORD || '',
+                'TELEGRAM_ENABLED',
+                'TELEGRAM_BOT_TOKEN',
+                'TELEGRAM_CHAT_ID',
+                'CF_PROXY_DOMAIN',
+                'PROXY_TYPE',
+                'PROXY_HOST',
+                'PROXY_PORT',
+                'PROXY_USERNAME',
+                'PROXY_PASSWORD',
                 
                 // WxPusher配置
-                WXPUSHER_ENABLED: process.env.WXPUSHER_ENABLED || 'false',
-                WXPUSHER_SPT: process.env.WXPUSHER_SPT || ''
-            };
+                'WXPUSHER_ENABLED',
+                'WXPUSHER_SPT'
+            ];
+            
+            // 构建配置对象
+            const config = {};
+            
+            // 从数据库获取配置值
+            for (const key of notificationConfigs) {
+                const notificationConfig = await AppDataSource.getRepository(NotificationConfig).findOneBy({ key });
+                config[key] = notificationConfig ? notificationConfig.value : '';
+                // 对于开关类型的配置，确保返回字符串形式的布尔值
+                if (key.endsWith('_ENABLED') && (config[key] === '1' || config[key] === 1)) {
+                    config[key] = 'true';
+                }
+            }
+            
             res.json({ success: true, data: config });
         } catch (error) {
+            console.error('获取通知配置失败:', error);
             res.status(500).json({ success: false, error: error.message });
         }
     });
@@ -909,69 +932,73 @@ AppDataSource.initialize().then(async () => {
     app.post('/api/config/notification', async (req, res) => {
         try {
             const config = req.body;
-            const envPath = path.resolve(process.cwd(), '.env');
-            let envContent = await fs.readFile(envPath, 'utf8');
-            let envLines = envContent.split('\n');
-
-            // 更新环境变量内容
-            const updateEnvVar = (name, value) => {
-                const existingLineIndex = envLines.findIndex(line => 
-                    line.trim().startsWith(`${name}=`)
-                );
+            
+            // 验证配置数据
+            if (!config) {
+                return res.status(400).json({ success: false, error: '无效的配置数据' });
+            }
+            
+            const notificationRepo = AppDataSource.getRepository(NotificationConfig);
+            
+            // 更新数据库中的配置
+            for (const [key, value] of Object.entries(config)) {
+                const description = getConfigDescription(key);
                 
-                if (existingLineIndex !== -1) {
-                    // 更新已存在的变量
-                    envLines[existingLineIndex] = `${name}=${value}`;
-                } else {
-                    // 在相同类型配置的最后一行后添加新变量
-                    const lastIndex = envLines.reduce((last, line, index) => {
-                        if (line.includes(name.split('_')[0])) {
-                            return index;
-                        }
-                        return last;
-                    }, -1);
-                    
-                    if (lastIndex !== -1) {
-                        envLines.splice(lastIndex + 1, 0, `${name}=${value}`);
-                    } else {
-                        envLines.push(`${name}=${value}`);
-                    }
+                // 查找或创建配置项
+                let notificationConfig = await notificationRepo.findOneBy({ key });
+                if (!notificationConfig) {
+                    notificationConfig = notificationRepo.create({ key });
                 }
-                process.env[name] = value;
-            };
-
-            // 更新钉钉配置
-            if (config.DINGTALK_ENABLED !== undefined) updateEnvVar('DINGTALK_ENABLED', config.DINGTALK_ENABLED);
-            if (config.DINGTALK_WEBHOOK !== undefined) updateEnvVar('DINGTALK_WEBHOOK', config.DINGTALK_WEBHOOK);
-            if (config.DINGTALK_SECRET !== undefined) updateEnvVar('DINGTALK_SECRET', config.DINGTALK_SECRET);
-
-            // 更新企业微信配置
-            if (config.WECOM_ENABLED !== undefined) updateEnvVar('WECOM_ENABLED', config.WECOM_ENABLED);
-            if (config.WECOM_WEBHOOK !== undefined) updateEnvVar('WECOM_WEBHOOK', config.WECOM_WEBHOOK);
-
-            // 更新Telegram配置
-            if (config.TELEGRAM_ENABLED !== undefined) updateEnvVar('TELEGRAM_ENABLED', config.TELEGRAM_ENABLED);
-            if (config.TELEGRAM_BOT_TOKEN !== undefined) updateEnvVar('TELEGRAM_BOT_TOKEN', config.TELEGRAM_BOT_TOKEN);
-            if (config.TELEGRAM_CHAT_ID !== undefined) updateEnvVar('TELEGRAM_CHAT_ID', config.TELEGRAM_CHAT_ID);
-            if (config.CF_PROXY_DOMAIN !== undefined) updateEnvVar('CF_PROXY_DOMAIN', config.CF_PROXY_DOMAIN);
-            if (config.PROXY_TYPE !== undefined) updateEnvVar('PROXY_TYPE', config.PROXY_TYPE);
-            if (config.PROXY_HOST !== undefined) updateEnvVar('PROXY_HOST', config.PROXY_HOST);
-            if (config.PROXY_PORT !== undefined) updateEnvVar('PROXY_PORT', config.PROXY_PORT);
-            if (config.PROXY_USERNAME !== undefined) updateEnvVar('PROXY_USERNAME', config.PROXY_USERNAME);
-            if (config.PROXY_PASSWORD !== undefined) updateEnvVar('PROXY_PASSWORD', config.PROXY_PASSWORD);
-
-            // 更新WxPusher配置
-            if (config.WXPUSHER_ENABLED !== undefined) updateEnvVar('WXPUSHER_ENABLED', config.WXPUSHER_ENABLED);
-            if (config.WXPUSHER_SPT !== undefined) updateEnvVar('WXPUSHER_SPT', config.WXPUSHER_SPT);
-
-            // 保存更新后的环境变量文件
-            await fs.writeFile(envPath, envLines.join('\n'));
-
+                
+                // 更新配置值
+                notificationConfig.value = value;
+                notificationConfig.description = description;
+                
+                // 保存到数据库
+                await notificationRepo.save(notificationConfig);
+                
+                // 同时更新环境变量以保持兼容性
+                process.env[key] = value;
+            }
+            
+            // 返回成功
             res.json({ success: true });
         } catch (error) {
+            console.error('更新通知配置失败:', error);
             res.status(500).json({ success: false, error: error.message });
         }
     });
+    
+    // 获取配置项的描述信息
+    function getConfigDescription(key) {
+        const descriptions = {
+            // 钉钉配置
+            'DINGTALK_ENABLED': '是否启用钉钉通知',
+            'DINGTALK_WEBHOOK': '钉钉机器人Webhook地址',
+            'DINGTALK_SECRET': '钉钉机器人安全设置Secret',
+            
+            // 企业微信配置
+            'WECOM_ENABLED': '是否启用企业微信通知',
+            'WECOM_WEBHOOK': '企业微信机器人Webhook地址',
+            
+            // Telegram配置
+            'TELEGRAM_ENABLED': '是否启用Telegram通知',
+            'TELEGRAM_BOT_TOKEN': 'Telegram机器人Token',
+            'TELEGRAM_CHAT_ID': 'Telegram聊天ID',
+            'CF_PROXY_DOMAIN': 'Cloudflare代理域名',
+            'PROXY_TYPE': '代理类型',
+            'PROXY_HOST': '代理主机',
+            'PROXY_PORT': '代理端口',
+            'PROXY_USERNAME': '代理用户名',
+            'PROXY_PASSWORD': '代理密码',
+            
+            // WxPusher配置
+            'WXPUSHER_ENABLED': '是否启用WxPusher通知',
+            'WXPUSHER_SPT': 'WxPusher SPT'
+        };
+        
+        return descriptions[key] || `${key}配置`;
+    }
 
     // 获取更新记录
     app.get('/api/logs', async (req, res) => {
@@ -1001,7 +1028,7 @@ AppDataSource.initialize().then(async () => {
     // 修改系统设置API，处理配置变更
     app.post('/api/system/config', async (req, res) => {
         try {
-            console.log('收到系统设置更新请求:', req.body)
+            // console.log('收到系统设置更新请求:', req.body)
             const { configs } = req.body;
             if (!Array.isArray(configs)) {
                 return res.status(400).json({ success: false, error: '无效的配置数据格式' });
@@ -1017,7 +1044,7 @@ AppDataSource.initialize().then(async () => {
             // 保存配置到数据库
             for (const config of configs) {
                 // 处理密码加密
-                if (config.key === 'AUTH_PASSWORD' && config.value !== '********') {
+                if (config.key === 'AUTH_PASSWORD') {
                     // 如果包含加密信息，则需要解密
                     if (config.encryptionData) {
                         const { keyId, publicKey, timestamp } = config.encryptionData;
@@ -1036,6 +1063,11 @@ AppDataSource.initialize().then(async () => {
                         try {
                             const decryptedPassword = cryptoUtil.aesDecrypt(config.value, keyInfo.publicKey);
                             // 使用解密后的明文密码更新配置
+                            // 如果密码是脱敏的（********），则跳过不更新
+                            if (decryptedPassword.includes('***')) {
+                                console.log(`跳过更新密码配置，因为值为脱敏状态: ${decryptedPassword}`);
+                                continue;
+                            }
                             await configService.setConfig(config.key, decryptedPassword, config.description);
                             
                             // 清除已使用的加密密钥
@@ -1111,6 +1143,29 @@ AppDataSource.initialize().then(async () => {
         } catch (error) {
             console.error('验证密码失败:', error);
             res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
+    // 测试发送通知
+    app.post('/api/config/notification/test', async (req, res) => {
+        try {
+            const results = await messageUtil.testSendMessage();
+            const success = results.every(result => result === true);
+            
+            if (success) {
+                res.json({ success: true });
+            } else {
+                res.json({ 
+                    success: false, 
+                    error: '部分通知发送失败，请检查配置' 
+                });
+            }
+        } catch (error) {
+            console.error('测试发送通知失败:', error);
+            res.status(500).json({ 
+                success: false, 
+                error: error.message 
+            });
         }
     });
 

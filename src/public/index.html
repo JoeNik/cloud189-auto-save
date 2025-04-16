@@ -13,7 +13,10 @@
     <link rel="stylesheet" href="/css/tabs.css">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/buttonMod.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
     <script>
         // 简单的加密函数
         function encryptPassword(password, publicKey, timestamp) {
@@ -135,8 +138,8 @@
                     </label>
                 </div>
                 <div class="form-group">
-                    <label for="dingTalkToken">Webhook Token</label>
-                    <input type="text" id="dingTalkToken" placeholder="填写钉钉机器人的 access_token">
+                    <label for="dingTalkToken">Webhook</label>
+                    <input type="text" id="dingTalkToken" placeholder="填写钉钉机器人的 webhook完整地址">
                 </div>
                 <div class="form-group">
                     <label for="dingTalkSecret">Secret</label>
@@ -202,6 +205,60 @@
                 <div class="form-group">
                     <label for="wxPusherSpt">SPT</label>
                     <input type="text" id="wxPusherSpt" placeholder="填写 WxPusher SPT">
+                </div>
+
+                <h3>测试通知</h3>
+                <div class="form-group">
+                    <label for="testNotificationContent">通知内容</label>
+                    <input type="text" id="testNotificationContent" placeholder="请输入测试通知内容" value="这是一条测试通知">
+                </div>
+                <div class="form-group">
+                    <button type="button" id="testNotification" class="btn-primary" onclick="
+                        (function() {
+                            console.log('测试通知按钮被点击');
+                            const notificationContent = document.getElementById('testNotificationContent').value || '这是一条测试通知';
+                            console.log('通知内容:', notificationContent);
+                            
+                            if (typeof toastr !== 'undefined') {
+                                toastr.info('正在发送测试通知...');
+                            } else {
+                                alert('正在发送测试通知...');
+                            }
+                            
+                            fetch('/api/config/notification/test', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ message: notificationContent })
+                            })
+                            .then(response => response.json())
+                            .then(result => {
+                                console.log('API响应:', result);
+                                if (result.success) {
+                                    if (typeof toastr !== 'undefined') {
+                                        toastr.success('测试消息发送成功');
+                                    } else {
+                                        alert('测试消息发送成功');
+                                    }
+                                } else {
+                                    if (typeof toastr !== 'undefined') {
+                                        toastr.error('测试消息发送失败: ' + result.error);
+                                    } else {
+                                        alert('测试消息发送失败: ' + result.error);
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                console.error('发送测试通知出错:', error);
+                                if (typeof toastr !== 'undefined') {
+                                    toastr.error('测试消息发送失败: ' + error.message);
+                                } else {
+                                    alert('测试消息发送失败: ' + error.message);
+                                }
+                            });
+                        })();
+                    ">发送测试通知</button>
                 </div>
 
                 <div class="form-actions">
@@ -473,8 +530,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <h2>通知配置</h2>
         <form id="notificationConfigForm">
             <div class="form-group">
-                <label for="dingTalkToken">钉钉 Webhook Token</label>
-                <input type="text" id="dingTalkToken" placeholder="填写钉钉机器人的 access_token">
+                <label for="dingTalkToken">钉钉 Webhook </label>
+                <input type="text" id="dingTalkToken" placeholder="填写钉钉机器人的 webhook完整地址">
             </div>
             <div class="form-group">
                 <label for="dingTalkSecret">钉钉 Secret</label>

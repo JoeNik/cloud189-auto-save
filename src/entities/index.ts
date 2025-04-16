@@ -157,3 +157,15 @@ export class Session implements ISession {
     @UpdateDateColumn()
     updatedAt: Date = new Date();
 }
+
+@Entity('notification_configs')
+export class NotificationConfig {
+    @PrimaryColumn('varchar', { length: 50 })
+    key: string = '';
+
+    @Column('text', { nullable: true })
+    value: string = '';
+
+    @Column('text', { nullable: true })
+    description: string = '';
+}

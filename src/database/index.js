@@ -1,6 +1,6 @@
 const { DataSource } = require('typeorm');
 const entities = require('../entities');
-const { Account, Task, TaskLog, Session, SystemConfig } = entities;
+const { Account, Task, TaskLog, Session, SystemConfig, NotificationConfig } = entities;
 const path = require('path');
 const dotenv = require('dotenv');
 
@@ -10,7 +10,7 @@ const AppDataSource = new DataSource({
     type: process.env.DB_TYPE || 'sqlite',
     database: process.env.DB_PATH || path.join(process.cwd(), 'data/database.sqlite'),
     synchronize: true,
-    entities: [Account, Task, TaskLog, Session, SystemConfig],
+    entities: [Account, Task, TaskLog, Session, SystemConfig, NotificationConfig],
     logging: process.env.NODE_ENV === 'development'
 });
 
@@ -32,6 +32,7 @@ const getTaskRepository = () => AppDataSource.getRepository(Task);
 const getTaskLogRepository = () => AppDataSource.getRepository(TaskLog);
 const getSessionRepository = () => AppDataSource.getRepository(Session);
 const getSystemConfigRepository = () => AppDataSource.getRepository(SystemConfig);
+const getNotificationConfigRepository = () => AppDataSource.getRepository(NotificationConfig);
 
 module.exports = {
     AppDataSource,
@@ -40,5 +41,6 @@ module.exports = {
     getTaskRepository,
     getTaskLogRepository,
     getSessionRepository,
-    getSystemConfigRepository
+    getSystemConfigRepository,
+    getNotificationConfigRepository
 };

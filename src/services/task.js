@@ -1,5 +1,6 @@
 const { Cloud189Service } = require('./cloud189');
 const { MessageUtil } = require('./message');
+const { BatchTaskDto } = require('../dto/BatchTaskDto');
 
 class TaskService {
     constructor(taskRepo, accountRepo, taskLogRepo, configService) {
@@ -331,10 +332,12 @@ class TaskService {
     async processTask(task) {
         let saveResults = [];
         try {
+            console.log(`[${task.resourceName}] 开始执行任务...`);
             const account = await this.accountRepo.findOneBy({ id: task.accountId });
             if (!account) {
                 throw new Error('账号不存在');
             }
+            // console.log(`[${task.resourceName}] 账号信息:`, account);
             const cloud189 = Cloud189Service.getInstance(account);
             // 获取分享文件列表并进行增量转存
             const shareDir = await cloud189.listShareDir(task.shareId, task.shareFolderId, task.shareMode,task.accessCode);
@@ -530,7 +533,7 @@ class TaskService {
     }
 
     // 检查任务状态
-    async checkTaskStatus(cloud189, taskId, count = 0) {
+    async checkTaskStatus(cloud189, taskId, count = 0, type) {
         if (count > 5) {
              return false;
         }
@@ -539,7 +542,8 @@ class TaskService {
         if (task.taskStatus == 3) {
             // 暂停200毫秒
             await new Promise(resolve => setTimeout(resolve, 200));
-            return await this.checkTaskStatus(cloud189,taskId, count++)
+            // 确保this上下文正确
+            return await this.checkTaskStatus.bind(this)(cloud189, taskId, count++, type)
         }
         if (task.taskStatus == 4) {
             return true;
@@ -554,38 +558,58 @@ class TaskService {
             }
             await cloud189.manageBatchTask(taskId, conflictTaskInfo.targetFolderId, taskInfos);
             await new Promise(resolve => setTimeout(resolve, 200));
-            return await this.checkTaskStatus(cloud189, taskId, count++)
+            // 确保this上下文正确
+            return await this.checkTaskStatus.bind(this)(cloud189, taskId, count++, type)
         }
         return false;
     }
 
      // 创建批量任务
      async createBatchTask(cloud189, batchTaskDto) {
+        console.log(`[批量任务] 开始创建任务, 参数: ${JSON.stringify(batchTaskDto)}`)
         const resp = await cloud189.createBatchTask(batchTaskDto);
         if (!resp) {
-            throw new Error('批量任务处理失败');
+            throw new Error('批量任务处理失败: 响应为空');
         }
         if (resp.res_code != 0) {
-            throw new Error(resp.res_msg);
+            throw new Error(`批量任务处理失败: ${resp.res_msg}`);
         }
-        logTaskEvent(`批量任务处理中: ${JSON.stringify(resp)}`)
-        if (!await this.checkTaskStatus(cloud189,resp.taskId, 0 , batchTaskDto.type)) {
-            throw new Error('检查批量任务状态: 批量任务处理失败');
+        if (!resp.taskId) {
+            throw new Error('批量任务处理失败: 任务ID为空');
         }
-        logTaskEvent(`批量任务处理完成`)
+        console.log(`[批量任务] 任务创建成功, 任务ID: ${resp.taskId}, 类型: ${batchTaskDto.type}`)
+        
+        // 确保this上下文正确
+        try {
+            const success = await this.checkTaskStatus.bind(this)(cloud189, resp.taskId, 0, batchTaskDto.type);
+            if (!success) {
+                throw new Error(`批量任务处理失败: 任务状态检查失败, 任务ID: ${resp.taskId}`);
+            }
+            console.log(`[批量任务] 任务处理完成, 任务ID: ${resp.taskId}`)
+        } catch (error) {
+            console.error(`[批量任务] 任务处理异常, 任务ID: ${resp.taskId}, 错误: ${error.message}`)
+            throw error;
+        }
     }
 
      // 定时清空回收站
      async clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle) {
+        console.log(`定时清空回收站任务开始执行`)
         const accounts = await this.accountRepo.find()
         if (accounts) {
             for (const account of accounts) {
                 let username = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
                 try {
                     const cloud189 = Cloud189Service.getInstance(account); 
-                    await this._clearRecycleBin(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle)
+                    // 确保this上下文正确
+                    await this._clearRecycleBin.bind(this)(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle)
+                    // 记录成功日志
+                    console.log(`清理回收站任务执行成功: ${username}`);
+                    await this.logTaskEvent(0, `清理回收站任务执行成功: ${username}`);
                 } catch (error) {
-                    logTaskEvent(`定时[${username}]清空回收站任务执行失败:${error.message}`);
+                    console.log(`定时[${username}]清空回收站任务执行失败:${error.message}`);
+                    // 记录失败日志
+                    await this.logTaskEvent(0, `清理回收站任务执行失败: ${username}, 错误: ${error.message}`);
                 }
             }
         }
@@ -599,9 +623,10 @@ class TaskService {
         }   
         const batchTaskDto = new BatchTaskDto(params);
         if (enableAutoClearRecycle) {
-            logTaskEvent(`开始清空[${username}]个人回收站`)
-            await this.createBatchTask(cloud189, batchTaskDto)
-            logTaskEvent(`清空[${username}]个人回收站完成`)
+            console.log(`开始清空[${username}]个人回收站`)
+            // 确保this上下文正确
+            await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
+            console.log(`清空[${username}]个人回收站完成`)
             // 延迟10秒
             await new Promise(resolve => setTimeout(resolve, 10000));
         }
@@ -609,13 +634,14 @@ class TaskService {
             // 获取家庭id
             const familyInfo = await cloud189.getFamilyInfo()
             if (familyInfo == null) {
-                logTaskEvent(`用户${username}没有家庭主账号, 跳过`)
+                console.log(`用户${username}没有家庭主账号, 跳过`)
                 return
             }
-            logTaskEvent(`开始清空[${username}]家庭回收站`)
+            console.log(`开始清空[${username}]家庭回收站`)
             batchTaskDto.familyId = familyInfo.familyId
-            await this.createBatchTask(cloud189, batchTaskDto)
-            logTaskEvent(`清空[${username}]家庭回收站完成`)
+            // 确保this上下文正确
+            await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
+            console.log(`清空[${username}]家庭回收站完成`)
         }
     }
 }
