@@ -66,7 +66,7 @@ async function fetchTasks() {
                     <td data-label="截止集数">${task.episodeThreshold || 0}</td>
                     <td data-label="更新数/总数">${task.currentEpisodes || 0}/${task.totalEpisodes || '未知'}${progressRing}</td>
                     <td data-label="定时任务">${task.cronExpression || '默认'}</td>
-                    <td data-label="使用正则匹配">${task.episodeUseRegex}</td>
+                    <td data-label="使用正则匹配">${task.episodeUseRegex == 1 ? '是':'否'}</td>
                     <td data-label="状态"><span class="status-badge status-${task.status}">${task.status}</span></td>
                 </tr>
             `;
