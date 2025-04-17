@@ -43,7 +43,7 @@ async function confirmFolderSelection() {
     }));
 
     if (selectedFolders.length === 0) {
-        alert('请至少选择一个文件夹');
+        toast.error('请至少选择一个文件夹');
         return;
     }
 
@@ -70,7 +70,7 @@ async function confirmFolderSelection() {
 
         if (!response.ok) {
             const error = await response.json();
-            alert(`创建任务失败: ${error.error}`);
+            toast.error(`创建任务失败: ${error.error}`);
             return;
         }
 
@@ -78,7 +78,7 @@ async function confirmFolderSelection() {
         if (data.success) {
             closeFolderSelectModal();
             document.getElementById('taskForm').reset();
-            alert('任务创建成功');
+            toast.success('任务创建成功');
             
             // 执行新创建的任务
             const tasks = Array.isArray(data.data) ? data.data : [data.data];
@@ -91,7 +91,7 @@ async function confirmFolderSelection() {
             throw new Error(data.error || '创建任务失败');
         }
     } catch (error) {
-        alert('创建任务失败: ' + error.message);
+        toast.error('创建任务失败: ' + error.message);
     }
 }
 
@@ -211,13 +211,13 @@ async function saveNotificationConfig(config) {
         const data = await response.json();
         if (data.success) {
             console.log('配置保存成功1');
-            alert('配置保存成功');
+            toast.success('配置保存成功');
         } else {
             throw new Error(data.error);
         }
     } catch (error) {
         console.error('保存通知配置失败:', error);
-        alert('保存通知配置失败: ' + error.message);
+        toast.success('保存通知配置失败: ' + error.message);
     }
 }
 
@@ -249,7 +249,7 @@ async function loadUpdateLogs() {
         });
     } catch (error) {
         console.error('加载更新记录失败:', error);
-        alert(error.message || '加载更新记录失败');
+        toast.error(error.message || '加载更新记录失败');
     }
 }
 
@@ -328,7 +328,7 @@ async function initializeApp() {
         e.preventDefault();
         const accountId = document.getElementById('accountId').value;
         if (!accountId) {
-            alert('请先选择账号');
+            toast.error('请先选择账号');
             return;
         }
         folderSelector.show(accountId);
@@ -364,7 +364,7 @@ async function handleTaskSubmit(e) {
         });
 
         if (response.ok) {
-            alert('任务创建成功');
+            toast.success('任务创建成功');
             document.getElementById('taskForm').reset();
             selectedFolders = [];
             document.getElementById('folderSelection').classList.add('hidden');
@@ -375,7 +375,7 @@ async function handleTaskSubmit(e) {
         }
     } catch (error) {
         console.error('创建任务失败:', error);
-        alert(error.message || '创建任务失败');
+        toast.error(error.message || '创建任务失败');
     }
 }
 
@@ -390,6 +390,7 @@ async function handleEditTaskSubmit(e) {
         episodeThreshold: document.getElementById('editEpisodeThreshold').value || 1000,
         episodeRegex: document.getElementById('editEpisodeRegex').value || null,
         episodeUseRegex: document.getElementById('editEpisodeUseRegex').checked ? 1 : 0,
+        maxKeepSaveFile: document.getElementById('editMaxKeepSaveFile').value || 100,
         whitelistKeywords: document.getElementById('editWhitelistKeywords').value || null,
         blacklistKeywords: document.getElementById('editBlacklistKeywords').value || null,
         cronExpression: document.getElementById('editCronExpression').value || null,
@@ -414,7 +415,7 @@ async function handleEditTaskSubmit(e) {
         if (response.ok) {
             const result = await response.json();
             console.log('服务器响应:', result);
-            alert('任务更新成功');
+            toast.success('任务更新成功');
             document.getElementById('editTaskModal').style.display = 'none';
             fetchTasks();
         } else {
@@ -423,7 +424,7 @@ async function handleEditTaskSubmit(e) {
         }
     } catch (error) {
         console.error('更新任务失败:', error);
-        alert(error.message || '更新任务失败');
+        toast.success(error.message || '更新任务失败');
     }
 }
 
@@ -457,7 +458,7 @@ async function loadTasks() {
                     <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                     ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}', 
                     '${task.shareLink}', '${task.accessCode}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
-                    '${task.targetFolderName || ''}', ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex || 0}, '${task.whitelistKeywords || ''}', 
+                    '${task.targetFolderName || ''}', ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', '${task.episodeUseRegex || 0}', '${task.maxKeepSaveFile}','${task.whitelistKeywords || ''}', 
                     '${task.blacklistKeywords || ''}')" class="btn btn-secondary mr-2">
                         <i class="fas fa-edit"></i>
                     </button>
@@ -477,13 +478,15 @@ async function loadTasks() {
 }
 
 // 显示编辑任务模态框
-async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
+async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, 
+                                episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
     document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
     document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
+    document.getElementById('editMaxKeepSaveFile').value = maxKeepSaveFile || 100;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editCronExpression').value = cronExpression || '';
@@ -533,7 +536,7 @@ async function showUpdateLogs(taskId) {
         modal.style.display = 'block';
     } catch (error) {
         console.error('加载更新日志失败:', error);
-        alert(error.message || '加载更新日志失败');
+        toast.error(error.message || '加载更新日志失败');
     }
 }
 
@@ -547,14 +550,14 @@ async function deleteTask(taskId) {
         });
 
         if (response.ok) {
-            alert('任务删除成功');
+            toast.success('任务删除成功');
             fetchTasks();
         } else {
-            alert('删除任务失败');
+            toast.success('删除任务失败');
         }
     } catch (error) {
         console.error('删除任务失败:', error);
-        alert('删除任务失败');
+        toast.success('删除任务失败');
     }
 }
 
@@ -574,7 +577,7 @@ async function handleFolderSelection(shareLink, accessCode) {
     try {
         const accountId = document.getElementById('accountId').value;
         if (!accountId) {
-            alert('请先选择账号');
+            toast.error('请先选择账号');
             return;
         }
 
@@ -629,7 +632,7 @@ async function handleFolderSelection(shareLink, accessCode) {
         });
     } catch (error) {
         console.error('获取文件夹列表失败:', error);
-        alert(error.message || '获取文件夹列表失败');
+        toast.error(error.message || '获取文件夹列表失败');
     }
 }
 
@@ -679,15 +682,15 @@ function initEditTaskForm() {
             const shareLink = document.getElementById('editShareLink').value;
             const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
-                alert('请先选择账号');
+                toast.error('请先选择账号');
                 return;
             }
             if (!taskId) {
-                alert('任务ID不存在--');
+                toast.error('任务ID不存在--');
                 return;
             }
             if (!shareLink) {
-                alert('分享链接不存在');
+                toast.error('分享链接不存在');
                 return;
             }
             await shareFolderSelector.show(taskId, accountId, shareLink, accessCode);
@@ -703,15 +706,15 @@ function initEditTaskForm() {
             const shareLink = document.getElementById('editShareLink').value;
             const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
-                alert('请先选择账号');
+                toast.error('请先选择账号');
                 return;
             }
             if (!taskId) {
-                console.log('任务ID不存在');
+                toast.error('任务ID不存在');
                 return;
             }
             if (!shareLink) {
-                alert('分享链接不存在');
+                toast.error('分享链接不存在');
                 return;
             }
             await shareFolderSelector.show(taskId, accountId, shareLink);
@@ -725,7 +728,7 @@ function initEditTaskForm() {
             e.preventDefault();
             const accountId = document.getElementById('accountId').value;
             if (!accountId) {
-                alert('请先选择账号');
+                toast.error('请先选择账号');
                 return;
             }
             targetFolderSelector.show(accountId);
@@ -802,7 +805,7 @@ class ShareFolderSelector {
                 this.onSelect(this.selectedFolder);
                 modal.style.display = 'none';
             } else {
-                alert('请选择一个目录');
+                toast.error('请选择一个目录');
             }
         };
     }
@@ -886,7 +889,7 @@ class ShareFolderSelector {
             }
         } catch (error) {
             console.error('获取分享目录失败:', error);
-            alert(error.message || '获取分享目录失败');
+            toast.error(error.message || '获取分享目录失败');
         }
     }
 }
@@ -904,7 +907,7 @@ async function checkLogin() {
             window.location.href = '/login.html';
         }
     } catch (error) {
-        alert('检查登录状态失败: ' + error.message);
+        toast.error('检查登录状态失败: ' + error.message);
         window.location.href = '/login.html';
     }
 }
@@ -919,9 +922,9 @@ async function logout() {
         if (data.success) {
             window.location.href = '/login.html';
         } else {
-            alert('登出失败');
+            toast.error('登出失败');
         }
     } catch (error) {
-        alert('登出失败: ' + error.message);
+        toast.error('登出失败: ' + error.message);
     }
 }

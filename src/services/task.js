@@ -1,6 +1,7 @@
 const { Cloud189Service } = require('./cloud189');
 const { MessageUtil } = require('./message');
 const { BatchTaskDto } = require('../dto/BatchTaskDto');
+const { Console } = require('console');
 
 class TaskService {
     constructor(taskRepo, accountRepo, taskLogRepo, configService) {
@@ -437,7 +438,7 @@ class TaskService {
     async getTasks() {
         return await this.taskRepo.find({
             order: {
-                id: 'DESC'
+                id: 'ASC'
             }
         });
     }
@@ -469,7 +470,7 @@ class TaskService {
         const allowedFields = [
             'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
             'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
-            'episodeThreshold', 'episodeRegex','episodeUseRegex', 'whitelistKeywords', 'blacklistKeywords',
+            'episodeThreshold', 'episodeRegex','episodeUseRegex','maxKeepSaveFile', 'whitelistKeywords', 'blacklistKeywords',
             'cronExpression'
         ];
         for (const field of allowedFields) {
@@ -501,6 +502,10 @@ class TaskService {
         }
         if (task.episodeThreshold !== null && task.episodeThreshold < 0) {
             throw new Error('截止集数不能为负数');
+        }
+
+        if(task.maxKeepSaveFile!== null && task.maxKeepSaveFile < 0) {
+            throw new Error('最大保存文件数不能为负数');
         }
 
         // 验证黑白名单关键字格式
@@ -648,6 +653,48 @@ class TaskService {
             // 确保this上下文正确
             await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
             console.log(`清空[${username}]家庭回收站完成`)
+        }
+    }
+
+    // 删除任务下的文件夹目录多余的文件
+    async processDeleteExtraFilesTask(cloud189, task) {
+        try{
+            // console.log('---------------',task)
+            const folderInfo = await this.getAllFolderFiles(cloud189, task.targetFolderId);
+            const files = folderInfo.filter(file =>!file.isFolder);
+            if (files.length > task.maxKeepSaveFile) {
+                const sortedFiles = files.sort((a, b) => b.createTime - a.createTime);
+                const filesToDelete = sortedFiles.slice(task.maxKeepSaveFile).map(file => ({ fileId: file.id, fileName: file.name, isFolder: 0 }));
+                console.log("目录下的文件", sortedFiles)
+                console.log("准备删除的文件", filesToDelete)
+                const deleteResult = await cloud189.delFile(filesToDelete, null); // 使用批量删除接口
+                if (deleteResult.res_code !== 0) {
+                    console.log(`删除${task.resourceName}目录下的文件失败, 原因:${deleteResult.res_msg}`)
+                    await this.logTaskEvent(0, `删除文件失败, 原因:${deleteResult.res_msg}`);
+                    return `删除文件失败, 原因:${deleteResult.res_msg}`
+                } else {
+                    console.log(`删除文件成功`)
+                    await this.logTaskEvent(0, `${task.resourceName}目录下的文件数量: ${files.length}, 超过最大保存文件数: ${task.maxKeepSaveFile}, 删除${files.length - task.maxKeepSaveFile}个文件成功`);
+                    return `${task.resourceName}目录下的文件数量: ${files.length}, 超过最大保存文件数: ${task.maxKeepSaveFile}, 删除${files.length - task.maxKeepSaveFile}个文件成功`
+                }
+
+                // const params = {
+                //     taskInfos: JSON.stringify(filesToDelete),
+                //     type: 'DELETE',
+                //     targetFolderId: null
+                // }   
+                // const batchTaskDto = new BatchTaskDto(params);
+                // await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
+                // console.log(`删除${task.resourceName}目录下的文件完成`)
+
+            }else{
+                console.log(`${task.targetFolderName}目录下的文件数量: ${files.length}, 小于最大保存文件数: ${task.maxKeepSaveFile}, 无需删除`)
+                return null
+            }
+        }catch (error) {
+            console.error('处理删除任务失败:', error);
+            // await this.taskRepo.save(task);
+            throw error;
         }
     }
 }

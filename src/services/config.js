@@ -12,7 +12,8 @@ class ConfigService {
             { key: 'FOLDER_CACHE_TTL', value: '600', description: '文件目录缓存时间（秒）' },
             { key: 'CLEAR_RECYCLE_INTERVAL', value: '0 2 * * * *', description: '清空回收站定时任务执行间隔（Cron表达式）' },
             { key: 'ENABLE_AUTO_CLEAR_RECYCLE', value: '0', description: '清理个人空间(0:不清理 1:清理)' },
-            { key: 'ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', value: '0', description: '清理家庭空间(0:不清理 1:清理)' }
+            { key: 'ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', value: '0', description: '清理家庭空间(0:不清理 1:清理)' },
+            { key: 'DELETE_EXTRAFILES_INTERVAL', value: '0 23 * * * *', description: '删除指定文件夹下文件任务执行间隔（Cron表达式）' },
         ];
     }
 

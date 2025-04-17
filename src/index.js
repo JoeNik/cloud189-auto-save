@@ -440,6 +440,9 @@ AppDataSource.initialize().then(async () => {
     
     // 存储清理任务的定时器
     let globalClearRecycleScheduler = null;
+
+    // 存储删除文件任务的定时器
+    let globalDeleteFileScheduler = null;
     
     // 系统设置相关API
     app.get('/api/system/config', async (req, res) => {
@@ -524,6 +527,77 @@ AppDataSource.initialize().then(async () => {
 
         return globalClearRecycleScheduler;
     };
+
+    // 设置定时删除指定文件夹下的多余文件任务
+    const setupDeleteExtraFilesTaskScheduler = async()=>{
+        // 如果已存在全局定时任务，先停止
+        if (globalDeleteFileScheduler) {
+            globalDeleteFileScheduler.stop();
+            console.log('已停止旧的定时删除指定文件夹下的多余文件任务');
+        }
+
+         // 从配置中获取定时表达式，确保是有效的cron表达式
+         let deleteExtraFilesInterval = await configService.getConfigValue('DELETE_EXTRAFILES_INTERVAL', '0 0 23 * * *'); // 每天23点执行
+         // 验证cron表达式是否有效，无效则使用默认值
+         try {
+             // 简单验证cron表达式格式
+             if (!deleteExtraFilesInterval || 
+                 !deleteExtraFilesInterval.trim() || 
+                 deleteExtraFilesInterval.split(' ').length < 5) {
+                 console.warn('无效的清理回收站cron表达式，使用默认值');
+                 deleteExtraFilesInterval = '0 0 2 * * *'; // 使用默认值
+             }
+             // 测试cron表达式是否可以解析
+             validateCron(deleteExtraFilesInterval);
+         } catch (error) {
+             console.error('清理删除指定文件夹文件cron表达式无效，使用默认值', error);
+             deleteExtraFilesInterval = '0 0 23 * * *'; // 使用默认值
+         }
+
+        try{
+            // 创建新的定时任务
+            globalDeleteFileScheduler = cron.schedule(deleteExtraFilesInterval, async () => {
+                console.log('执行定时删除指定文件夹下的多余文件任务...');
+                try {
+                    const tasks = await taskService.getTasks();
+                    console.log(`找到${tasks.length}个定时删除指定文件夹下的多余文件任务`);
+                    let saveResults = [];
+                    for (const task of tasks) {
+                        try {
+                            // console.log('task',task)
+                            const account = await accountRepo.findOneBy({ id: task.accountId });
+                            if (!account) {
+                                console.log(`账号${account.id}不存在，跳过删除文件任务`);
+                                continue
+                            }
+                            const cloud189 = Cloud189Service.getInstance(account);
+                            const result = await taskService.processDeleteExtraFilesTask(cloud189,task);
+                            if (result) {
+                                saveResults.push(result);
+                            }
+                        } catch (error) {
+                            console.error(`任务${task.id}执行失败:`, error);
+                        }
+                    }
+                    if (saveResults.length > 0) {
+                        messageUtil.sendMessage(saveResults.join("\n\n"));
+                    }
+                } catch (error) {
+                    console.error('定时定时删除指定文件夹下的多余文件任务执行失败:', error); 
+                } 
+            }, {
+                scheduled: true,
+                timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
+            });
+            console.log('定时定时删除指定文件夹下的多余文件任务设置成功');
+
+           
+        }catch (error) {
+            console.error('设执行定时删除指定文件夹下的多余文件任务失败:', error);
+            // 设置失败时返回null，不影响主程序运行
+            return null;
+        }
+    }
 
     // 设置全局定时任务
     const setupGlobalTaskScheduler = async () => {
@@ -666,7 +740,7 @@ AppDataSource.initialize().then(async () => {
             const { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, shareFolderId, targetFolderName, 
-                episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords,
+                episodeThreshold, episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
                 cronExpression 
             } = req.body;
             
@@ -674,7 +748,7 @@ AppDataSource.initialize().then(async () => {
             let updates = { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, targetFolderName, 
-                episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords,
+                episodeThreshold, episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
                 cronExpression 
             };
 
@@ -1038,6 +1112,9 @@ AppDataSource.initialize().then(async () => {
 
             // 标记是否需要重新设置清空回收站任务
             let needResetClearRecycleScheduler = false;
+
+            // 标记是否需要重新设置删除指定文件夹下的文件
+            let needResetDeleteExtraFilesTaskScheduler = false;
             
             // 保存配置到数据库
             for (const config of configs) {
@@ -1097,6 +1174,10 @@ AppDataSource.initialize().then(async () => {
                 if (config.key === 'CLEAR_RECYCLE_INTERVAL') {
                     needResetClearRecycleScheduler = true;  
                 }
+
+                if(config.key=== 'DELETE_EXTRAFILES_INTERVAL'){
+                    needResetDeleteExtraFilesTaskScheduler = true;
+                }
             }
             
             // 更新缓存过期时间
@@ -1119,6 +1200,9 @@ AppDataSource.initialize().then(async () => {
                 await setupClearRecycleTaskScheduler();
             }
             
+            if (needResetDeleteExtraFilesTaskScheduler){
+                await setupDeleteExtraFilesTaskScheduler();
+            }
             res.json({ success: true });
         } catch (error) {
             console.error('更新系统设置失败:', error);
@@ -1177,6 +1261,8 @@ AppDataSource.initialize().then(async () => {
         await initCustomTaskSchedulers();
         // 设置清空回收站定时任务
         await setupClearRecycleTaskScheduler();
+        // 设置删除指定文件夹下的文件定时任务
+        await setupDeleteExtraFilesTaskScheduler();
     });
 }).catch(error => {
     console.error('数据库连接失败:', error);

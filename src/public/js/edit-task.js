@@ -18,7 +18,7 @@ let editFolderSelector = new FolderSelector({
     }
 });
 
-function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
+function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex,editeMaxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTargetFolder').value = targetFolderName?targetFolderName:targetFolderId;
@@ -28,6 +28,7 @@ function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, s
     document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
     document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
+    document.getElementById('editeMaxKeepSaveFile').value = editeMaxKeepSaveFile || 100;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editStatus').value = status;
@@ -72,6 +73,7 @@ function initEditTaskForm() {
         const episodeThreshold = document.getElementById('editEpisodeThreshold').value;
         const episodeRegex = document.getElementById('editEpisodeRegex').value;
         const episodeUseRegex = document.getElementById('editEpisodeUseRegex').checked ? 1 : 0;
+        const editeMaxKeepSaveFile = document.getElementById('editeMaxKeepSaveFile').value;
         const whitelistKeywords = document.getElementById('editWhitelistKeywords').value;
         const blacklistKeywords = document.getElementById('editBlacklistKeywords').value;
         const cronExpression = document.getElementById('editCronExpression') ? 
@@ -89,6 +91,7 @@ function initEditTaskForm() {
                     episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : 1000,
                     episodeRegex: episodeRegex || null,
                     episodeUseRegex,
+                    maxKeepSaveFile: editeMaxKeepSaveFile? parseInt(editeMaxKeepSaveFile) : 100,
                     whitelistKeywords: whitelistKeywords || null,
                     blacklistKeywords: blacklistKeywords || null,
                     status,

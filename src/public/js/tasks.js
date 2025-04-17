@@ -57,7 +57,7 @@ async function fetchTasks() {
                         <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                          ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, 
                          '${task.status}','${task.shareLink}', '${task.accessCode}', '${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.targetFolderName}', 
-                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex || 0}, '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}')">修改</button>
+                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', '${task.episodeUseRegex || 0}','${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}')">修改</button>
                     </td>
                     <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName?(task.resourceName + '/' + task.shareFolderName): task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>

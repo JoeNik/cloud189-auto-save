@@ -81,6 +81,8 @@ export class Task {
     @Column({ nullable: true })
     targetRegex?: string;
 
+    @Column({ default: 100 })
+    maxKeepSaveFile!: number; // 保留的文件个数
 
     @Column({ nullable: true })
     whitelistKeywords?: string;

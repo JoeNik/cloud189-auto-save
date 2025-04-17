@@ -303,6 +303,26 @@ class Cloud189Service {
         }
         return null
     }
+
+    // 删除文件 fileinfos和targetFolderId选一个即可，勿同时使用
+    async delFile(fileinfos, targetFolderId) {
+        console.log("========== 开始删除任务 ============")
+        console.log("taskInfos: ", fileinfos)
+        console.log("targetFolderId: ", targetFolderId)
+        const response = await this.client.request('https://cloud.189.cn/api/open/batch/createBatchTask.action', {
+            method: 'POST',
+            form: {
+                type: 'DELETE',
+                taskInfos:JSON.stringify(fileinfos), // [{"fileId":"223503189144344415","fileName":"云盘接入DeepSeek满血版：免费稳定流畅.mp4","isFolder":0}]
+                targetFolderId: null
+            },
+            headers: {
+                'Accept': 'application/json;charset=UTF-8',
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+        }).json();
+        return response;
+    }
 }
 
 module.exports = { Cloud189Service };
