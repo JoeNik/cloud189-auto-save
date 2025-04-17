@@ -27,7 +27,7 @@ function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, s
     document.getElementById('editTotalEpisodes').value = totalEpisodes;
     document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
-    document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
+    document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex == 1;
     document.getElementById('editeMaxKeepSaveFile').value = editeMaxKeepSaveFile || 100;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';

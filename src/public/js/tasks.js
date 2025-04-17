@@ -57,7 +57,7 @@ async function fetchTasks() {
                         <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                          ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, 
                          '${task.status}','${task.shareLink}', '${task.accessCode}', '${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.targetFolderName}', 
-                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', '${task.episodeUseRegex || 0}','${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}')">修改</button>
+                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex},'${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}')">修改</button>
                     </td>
                     <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName?(task.resourceName + '/' + task.shareFolderName): task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>
@@ -66,6 +66,7 @@ async function fetchTasks() {
                     <td data-label="截止集数">${task.episodeThreshold || 0}</td>
                     <td data-label="更新数/总数">${task.currentEpisodes || 0}/${task.totalEpisodes || '未知'}${progressRing}</td>
                     <td data-label="定时任务">${task.cronExpression || '默认'}</td>
+                    <td data-label="使用正则匹配">${task.episodeUseRegex}</td>
                     <td data-label="状态"><span class="status-badge status-${task.status}">${task.status}</span></td>
                 </tr>
             `;

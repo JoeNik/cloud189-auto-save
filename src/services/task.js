@@ -36,14 +36,17 @@ class TaskService {
 
     // 从文件名中提取集数
     _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex) {
+        console.log(`开始解析 ${fileName} 的集数,正则: ${episodeRegex},是否使用正则: ${episodeUseRegex}`);
 
         // 如果不使用正则表达式
         if (episodeUseRegex === 0) {
+            console.log(`[${fileName}] 不使用正则表达式解析集数`);
             return null;
         }
         // 如果提供了自定义正则表达式
         if (episodeRegex) {
             try {
+                console.log('[自定义正则] 使用自定义正则表达式解析集数')
                 const regex = new RegExp(episodeRegex);
                 const match = fileName.match(regex);
                 if (match && match[1]) {
@@ -57,6 +60,7 @@ class TaskService {
         // 使用默认正则表达式
         for (const regex of this.defaultEpisodeRegex) {
             const match = fileName.match(regex);
+            console.log(`[默认正则] 使用正则 ${regex}`);
             if (match && match[1]) {
                 const episodeNumber = parseInt(match[1]);
                 if (!isNaN(episodeNumber)) {
