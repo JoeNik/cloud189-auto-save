@@ -18,22 +18,26 @@ let editFolderSelector = new FolderSelector({
     }
 });
 
-function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords) {
+function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTargetFolder').value = targetFolderName?targetFolderName:targetFolderId;
     document.getElementById('editTargetFolderId').value = targetFolderId;
     document.getElementById('editCurrentEpisodes').value = currentEpisodes;
     document.getElementById('editTotalEpisodes').value = totalEpisodes;
-    document.getElementById('editEpisodeThreshold').value = episodeThreshold || '';
+    document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
+    document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editStatus').value = status;
-    document.getElementById('shareLink').value = shareLink;
+    document.getElementById('editShareLink').value = shareLink;
     document.getElementById('editAccessCode').value = accessCode || '';
     document.getElementById('shareFolder').value = shareFolderName;
     document.getElementById('shareFolderId').value = shareFolderId;
+    if (document.getElementById('editCronExpression')) {
+        document.getElementById('editCronExpression').value = cronExpression || '';
+    }
     document.getElementById('editTaskModal').style.display = 'block';
 }
 
@@ -59,16 +63,19 @@ function initEditTaskForm() {
         const id = document.getElementById('editTaskId').value;
         const resourceName = document.getElementById('editResourceName').value;
         const targetFolderId = document.getElementById('editTargetFolderId').value;
-        const targetFolderName = document.getElementById('editTargetFolderName').value;
+        const targetFolderName = document.getElementById('editTargetFolder').value;
         const currentEpisodes = document.getElementById('editCurrentEpisodes').value;
         const totalEpisodes = document.getElementById('editTotalEpisodes').value;
         const status = document.getElementById('editStatus').value;
-        const shareFolderName = document.getElementById('editShareFolderName').value;
-        const shareFolderId = document.getElementById('editShareFolderId').value;
+        const shareFolderName = document.getElementById('shareFolder').value;
+        const shareFolderId = document.getElementById('shareFolderId').value;
         const episodeThreshold = document.getElementById('editEpisodeThreshold').value;
         const episodeRegex = document.getElementById('editEpisodeRegex').value;
+        const episodeUseRegex = document.getElementById('editEpisodeUseRegex').checked ? 1 : 0;
         const whitelistKeywords = document.getElementById('editWhitelistKeywords').value;
         const blacklistKeywords = document.getElementById('editBlacklistKeywords').value;
+        const cronExpression = document.getElementById('editCronExpression') ? 
+                              document.getElementById('editCronExpression').value : null;
 
         try {
             const response = await fetch(`/api/tasks/${id}`, {
@@ -79,14 +86,16 @@ function initEditTaskForm() {
                     targetFolderId,
                     currentEpisodes: parseInt(currentEpisodes),
                     totalEpisodes: parseInt(totalEpisodes),
-                    episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : null,
+                    episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : 1000,
                     episodeRegex: episodeRegex || null,
+                    episodeUseRegex,
                     whitelistKeywords: whitelistKeywords || null,
                     blacklistKeywords: blacklistKeywords || null,
                     status,
                     shareFolderName,
                     shareFolderId,
-                    targetFolderName
+                    targetFolderName,
+                    cronExpression: cronExpression || null
                 })
             });
 

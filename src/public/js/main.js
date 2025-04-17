@@ -387,8 +387,9 @@ async function handleEditTaskSubmit(e) {
         resourceName: document.getElementById('editResourceName').value,
         totalEpisodes: document.getElementById('editTotalEpisodes').value || null,
         currentEpisodes: document.getElementById('editCurrentEpisodes').value || null,
-        episodeThreshold: document.getElementById('editEpisodeThreshold').value || null,
+        episodeThreshold: document.getElementById('editEpisodeThreshold').value || 1000,
         episodeRegex: document.getElementById('editEpisodeRegex').value || null,
+        episodeUseRegex: document.getElementById('editEpisodeUseRegex').checked ? 1 : 0,
         whitelistKeywords: document.getElementById('editWhitelistKeywords').value || null,
         blacklistKeywords: document.getElementById('editBlacklistKeywords').value || null,
         cronExpression: document.getElementById('editCronExpression').value || null,
@@ -456,7 +457,7 @@ async function loadTasks() {
                     <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                     ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}', 
                     '${task.shareLink}', '${task.accessCode}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
-                    '${task.targetFolderName || ''}', ${task.episodeThreshold || 'null'}, '${task.episodeRegex || ''}', '${task.whitelistKeywords || ''}', 
+                    '${task.targetFolderName || ''}', ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex || 0}, '${task.whitelistKeywords || ''}', 
                     '${task.blacklistKeywords || ''}')" class="btn btn-secondary mr-2">
                         <i class="fas fa-edit"></i>
                     </button>
@@ -476,12 +477,13 @@ async function loadTasks() {
 }
 
 // 显示编辑任务模态框
-async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
+async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
-    document.getElementById('editEpisodeThreshold').value = episodeThreshold || '';
+    document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
+    document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editCronExpression').value = cronExpression || '';

@@ -34,7 +34,12 @@ class TaskService {
     }
 
     // 从文件名中提取集数
-    _getEpisodeNumber(fileName, episodeRegex) {
+    _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex) {
+
+        // 如果不使用正则表达式
+        if (episodeUseRegex === 0) {
+            return null;
+        }
         // 如果提供了自定义正则表达式
         if (episodeRegex) {
             try {
@@ -107,7 +112,7 @@ class TaskService {
             return true;
         }
 
-        const episodeNumber = this._getEpisodeNumber(fileName, task.episodeRegex);
+        const episodeNumber = this._getEpisodeNumber(fileName, task.episodeRegex, task.episodeUseRegex);
         if (episodeNumber === null) {
             console.log(`[${task.resourceName}] 文件 ${fileName} 无法解析集数，默认保存`);
             return true;
@@ -363,7 +368,7 @@ class TaskService {
                 const resourceName = task.shareFolderName ? `${task.resourceName}/${task.shareFolderName}` : task.resourceName;
                 const taskInfoList = [];
                 const fileDetailsList = [];
-                let maxEpisode = task.episodeThreshold || 0;
+                let maxEpisode = task.episodeThreshold || 1000;
                 let totalSize = 0;
 
                 // 构建任务信息列表
@@ -379,8 +384,8 @@ class TaskService {
                     totalSize += file.size;
 
                     // 更新最大集数
-                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex);
-                    if (episodeNumber && episodeNumber > maxEpisode) {
+                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex,task.episodeUseRegex);
+                    if (episodeNumber!= null && episodeNumber && episodeNumber > maxEpisode) {
                         maxEpisode = episodeNumber;
                     }
                 }
@@ -464,7 +469,7 @@ class TaskService {
         const allowedFields = [
             'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
             'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
-            'episodeThreshold', 'episodeRegex', 'whitelistKeywords', 'blacklistKeywords',
+            'episodeThreshold', 'episodeRegex','episodeUseRegex', 'whitelistKeywords', 'blacklistKeywords',
             'cronExpression'
         ];
         for (const field of allowedFields) {

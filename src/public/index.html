@@ -468,6 +468,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <label for="editEpisodeThreshold">截止集数</label>
                 <input type="number" id="editEpisodeThreshold" min="0" placeholder="超过此集数的文件不会保存">
             </div>
+            <div>
+                <label for="editEpisodeUseRegex">使用正则提取集数</label>
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="editEpisodeUseRegex" 
+                        name="editEpisodeUseRegex">
+                    <label class="custom-control-label" for="editEpisodeUseRegex">开关</label>
+                </div>
+            </div>
             <div class="form-group">
                 <label for="editEpisodeRegex">集数提取正则</label>
                 <input type="text" id="editEpisodeRegex" placeholder="用于从文件名中提取集数的正则表达式">

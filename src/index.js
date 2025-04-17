@@ -666,7 +666,7 @@ AppDataSource.initialize().then(async () => {
             const { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, shareFolderId, targetFolderName, 
-                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords,
+                episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords,
                 cronExpression 
             } = req.body;
             
@@ -674,7 +674,7 @@ AppDataSource.initialize().then(async () => {
             let updates = { 
                 resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
                 status, shareFolderName, targetFolderName, 
-                episodeThreshold, episodeRegex, whitelistKeywords, blacklistKeywords,
+                episodeThreshold, episodeRegex,episodeUseRegex, whitelistKeywords, blacklistKeywords,
                 cronExpression 
             };
 

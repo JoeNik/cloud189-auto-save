@@ -72,11 +72,15 @@ export class Task {
     @Column({ nullable: true })
     episodeRegex?: string;
 
+    @Column({ default: 1 })
+    episodeUseRegex!: number;
+
     @Column({ nullable: true })
     sourceRegex?: string;
 
     @Column({ nullable: true })
     targetRegex?: string;
+
 
     @Column({ nullable: true })
     whitelistKeywords?: string;
@@ -98,6 +102,7 @@ export class Task {
 
     @Column('text', { nullable: true })
     cronExpression?: string;
+
 
     @CreateDateColumn()
     createdAt!: Date;
