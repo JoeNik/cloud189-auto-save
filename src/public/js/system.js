@@ -42,9 +42,9 @@ function toggleRecycle(checkbox) {
     checkbox.value = checkbox.checked ? '1' : '0';
     // 显示提示信息
     if (checkbox.checked) {
-        toast.info('已启用个人回收站自动清理');
+        toast.info('启用个人回收站自动清理');
     } else {
-        toast.info('已禁用个人回收站自动清理');
+        toast.info('禁用个人回收站自动清理');
     }
 }
 
@@ -55,9 +55,65 @@ function toggleFamilyRecycle(checkbox) {
     checkbox.value = checkbox.checked ? '1' : '0';
     // 显示提示信息
     if (checkbox.checked) {
-        toast.info('已启用家庭回收站自动清理');
+        toast.info('启用家庭回收站自动清理');
     } else {
-        toast.info('已禁用家庭回收站自动清理');
+        toast.info('禁用家庭回收站自动清理');
+    }
+}
+
+// 切换签到功能开关
+function toggleSignIn(checkbox) {
+    console.log('切换签到功能开关：', checkbox.checked);
+    // 复选框的value值会根据是否选中改变
+    checkbox.value = checkbox.checked ? '1' : '0';
+    // 显示提示信息
+    if (checkbox.checked) {
+        toast.info('启用自动签到功能');
+    } else {
+        toast.info('禁用自动签到功能');
+    }
+}
+
+// 立即执行签到
+async function executeSignInNow() {
+    const statusElement = document.getElementById('signInStatus');
+    const signInButton = document.getElementById('signInNow');
+    
+    try {
+        statusElement.textContent = '签到中...';
+        signInButton.disabled = true;
+        
+        // 获取当前签到并发数设置
+        const execThreshold = document.getElementById('signInExecThreshold').value || 1;
+        // 获取家庭ID列表
+        const families = document.getElementById('signInFamilies').value || '';
+        
+        const response = await fetch('/api/cloud189/sign-in', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                execThreshold: parseInt(execThreshold),
+                families: families.split(',').filter(id => id.trim() !== '')
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusElement.textContent = '签到成功！' + (data.message ? ` ${data.message}` : '');
+            toast.success('签到成功！');
+        } else {
+            statusElement.textContent = '签到失败：' + data.error;
+            toast.error('签到失败：' + data.error);
+        }
+    } catch (error) {
+        console.error('执行签到出错：', error);
+        statusElement.textContent = '签到失败：' + error.message;
+        toast.error('签到失败：' + error.message);
+    } finally {
+        signInButton.disabled = false;
     }
 }
 
@@ -77,6 +133,20 @@ function setupCheckboxListeners() {
         familyRecycleCheckbox.addEventListener('change', function() {
             toggleFamilyRecycle(this);
         });
+    }
+    
+    // 签到功能复选框
+    const signInCheckbox = document.getElementById('Enable_Sign_In_Task');
+    if (signInCheckbox) {
+        signInCheckbox.addEventListener('change', function() {
+            toggleSignIn(this);
+        });
+    }
+    
+    // 立即签到按钮
+    const signInButton = document.getElementById('signInNow');
+    if (signInButton) {
+        signInButton.addEventListener('click', executeSignInNow);
     }
 }
 
@@ -117,12 +187,32 @@ async function saveSystemConfig(e) {
             formData.set('AUTH_PASSWORD', encryptedPassword);
         }
         
+        // 特别处理复选框，确保即使未选中也发送值
+        const checkboxItems = [
+            {id: 'Enable_Auto_Clear_Recycle', name: 'ENABLE_AUTO_CLEAR_RECYCLE'}, 
+            {id: 'Enable_Auto_Clear_Family_Recycle', name: 'ENABLE_AUTO_CLEAR_FAMILY_RECYCLE'},
+            {id: 'Enable_Sign_In_Task', name: 'ENABLE_SIGN_IN_TASK'}
+        ];
+        
+        // 确保所有复选框都有值
+        checkboxItems.forEach(item => {
+            const checkbox = document.getElementById(item.id);
+            if (checkbox && checkbox.type === 'checkbox') {
+                const value = checkbox.checked ? '1' : '0';
+                formData.set(item.name, value);
+                console.log(`设置复选框 ${item.name} = ${value}, ID=${item.id}, 找到元素:`, !!checkbox);
+            } else {
+                console.log(`找不到复选框元素: ID=${item.id}`);
+            }
+        });
+        
         // 收集表单数据
         for (const [key, value] of formData.entries()) {
             // 对于密码字段，如果为空则不更新
             if (key === 'AUTH_PASSWORD' && value === '') {
                 continue;
             }
+            console.log(`保存配置: ${key} = ${value} }`)
             
             // 查找原配置项
             const originalConfig = systemConfigs.find(c => c.key === key);

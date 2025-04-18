@@ -620,11 +620,11 @@ class TaskService {
                     await this._clearRecycleBin.bind(this)(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle)
                     // 记录成功日志
                     console.log(`清理回收站任务执行成功: ${username}`);
-                    await this.logTaskEvent(0, `清理回收站任务执行成功: ${username}`);
+                    // await this.logTaskEvent(0, `清理回收站任务执行成功: ${username}`);
                 } catch (error) {
                     console.log(`定时[${username}]清空回收站任务执行失败:${error.message}`);
                     // 记录失败日志
-                    await this.logTaskEvent(0, `清理回收站任务执行失败: ${username}, 错误: ${error.message}`);
+                    await this.logTaskEvent.bind(this)(0, `清理回收站任务执行失败: ${username}, 错误: ${error.message}`);
                 }
             }
         }
@@ -642,6 +642,7 @@ class TaskService {
             // 确保this上下文正确
             await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
             console.log(`清空[${username}]个人回收站完成`)
+            await this.logTaskEvent.bind(this)(0, `清空[${username}]个人回收站完成`);
             // 延迟10秒
             await new Promise(resolve => setTimeout(resolve, 10000));
         }
@@ -657,6 +658,7 @@ class TaskService {
             // 确保this上下文正确
             await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
             console.log(`清空[${username}]家庭回收站完成`)
+            await this.logTaskEvent.bind(this)(0, `清空[${username}]家庭回收站完成`);
         }
     }
 
@@ -674,30 +676,41 @@ class TaskService {
                 const deleteResult = await cloud189.delFile(filesToDelete, null); // 使用批量删除接口
                 if (deleteResult.res_code !== 0) {
                     console.log(`删除${task.resourceName}目录下的文件失败, 原因:${deleteResult.res_msg}`)
-                    await this.logTaskEvent(0, `删除文件失败, 原因:${deleteResult.res_msg}`);
+                    await this.logTaskEvent.bind(this)(0, `删除文件失败, 原因:${deleteResult.res_msg}`);
                     return `删除文件失败, 原因:${deleteResult.res_msg}`
                 } else {
                     console.log(`删除文件成功`)
-                    await this.logTaskEvent(0, `${task.resourceName}目录下的文件数量: ${files.length}, 超过最大保存文件数: ${task.maxKeepSaveFile}, 删除${files.length - task.maxKeepSaveFile}个文件成功`);
+                    await this.logTaskEvent.bind(this)(0, `${task.resourceName}目录下的文件数量: ${files.length}, 超过最大保存文件数: ${task.maxKeepSaveFile}, 删除${files.length - task.maxKeepSaveFile}个文件成功`);
                     return `${task.resourceName}目录下的文件数量: ${files.length}, 超过最大保存文件数: ${task.maxKeepSaveFile}, 删除${files.length - task.maxKeepSaveFile}个文件成功`
                 }
-
-                // const params = {
-                //     taskInfos: JSON.stringify(filesToDelete),
-                //     type: 'DELETE',
-                //     targetFolderId: null
-                // }   
-                // const batchTaskDto = new BatchTaskDto(params);
-                // await this.createBatchTask.bind(this)(cloud189, batchTaskDto)
-                // console.log(`删除${task.resourceName}目录下的文件完成`)
-
-            }else{
+            } else {
                 console.log(`${task.targetFolderName}目录下的文件数量: ${files.length}, 小于最大保存文件数: ${task.maxKeepSaveFile}, 无需删除`)
                 return null
             }
-        }catch (error) {
-            console.error('处理删除任务失败:', error);
-            // await this.taskRepo.save(task);
+        } catch (error) {
+            console.error('删除文件任务执行失败:', error);
+            await this.logTaskEvent.bind(this)(0, `删除文件任务执行失败: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async cloudSignTask(cloud189, execThreshold=1, families=[]){
+        try{
+            const signRlt = await cloud189.userSign(execThreshold);
+            // 延迟10秒
+            await new Promise(resolve => setTimeout(resolve, 10000));
+
+            const familySignRlt = await cloud189.familySign(families);
+
+            // 确保this上下文正确
+            await this.logTaskEvent.bind(this)(0, `签到完成, ${signRlt}, 家庭签到:${familySignRlt}`);
+            
+            // 返回签到结果
+            return `${signRlt}, ${familySignRlt}`;
+        } catch (error) {
+            console.error('签到失败:', error);
+            // 确保this上下文正确
+            await this.logTaskEvent.bind(this)(0, `签到失败:${error.message}`);
             throw error;
         }
     }

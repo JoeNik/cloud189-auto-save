@@ -1,5 +1,6 @@
 const { CloudClient, FileTokenStore } = require('cloud189-sdk');
 const crypto = require('crypto');
+const { rawListeners } = require('process');
 class Cloud189Service {
     static instances = new Map();
 
@@ -322,6 +323,51 @@ class Cloud189Service {
             }
         }).json();
         return response;
+    }
+
+    //  个人签到 execThreshold: 并发数 默认1,若要填，建议5
+    async userSign(execThreshold = 1) {
+        const tasks = Array.from({ length: execThreshold }, () =>
+            this.client.userSign()
+        );
+        const result = (await Promise.allSettled(tasks)).filter(
+            ({ status, value }) => status === "fulfilled" && !value.isSign && value.netdiskBonus
+        );
+        const rlt = `个人签到任务: 成功数/总请求数 ${result.length}/${tasks.length} 获得 ${
+            result.map(({ value }) => value.netdiskBonus)?.join(",") || "0"
+        }M 空间`;
+        console.log(rlt);
+        return rlt;
+    }
+
+    async familySign(families = []) {
+        const { familyInfoResp } = await this.client.getFamilyList();
+        if (familyInfoResp) {
+            let familyId = null;
+            //指定家庭签到
+            if (families.length > 0) {
+                const tagetFamily = familyInfoResp.find((familyInfo) =>
+                families.includes(familyInfo.remarkName)
+            );
+            if (tagetFamily) {
+                familyId = tagetFamily.familyId;
+            } else {
+                return `没有加入到指定家庭分组${families.toString()}`;
+            }
+            } else {
+                familyId = familyInfoResp[0].familyId;
+            }
+            console.log(`执行家庭签到ID:${familyId}`);
+            const tasks = [ this.client.familyUserSign(familyId) ];
+            const result = (await Promise.allSettled(tasks)).filter(
+                ({ status, value }) => status === "fulfilled" && !value.signStatus && value.bonusSpace
+            );
+            console.log('家庭签到返回:', result);
+            return `家庭签到任务: 获得 ${
+                result.map(({ value }) => value.bonusSpace)?.join(",") || "0"
+            }M 空间`;
+        }
+        return "没有找到家庭信息";
     }
 }
 

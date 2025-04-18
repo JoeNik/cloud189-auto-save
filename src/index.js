@@ -42,6 +42,18 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
+// // 验证登录中间件
+// const checkLogin = (req, res, next) => {
+//     if (req.session && req.session.user) {
+//         next();
+//     } else {
+//         res.status(401).json({ success: false, error: '请先登录' });
+//     }
+// };
+
+// // API路由
+// app.use('/api/*', checkLogin);
+
 // 初始化数据库连接
 AppDataSource.initialize().then(async () => {
     console.log('数据库连接成功');
@@ -443,6 +455,9 @@ AppDataSource.initialize().then(async () => {
 
     // 存储删除文件任务的定时器
     let globalDeleteFileScheduler = null;
+
+    // 存储签到任务的定时器
+    let globalSignInTaskScheduler = null;
     
     // 系统设置相关API
     app.get('/api/system/config', async (req, res) => {
@@ -527,6 +542,93 @@ AppDataSource.initialize().then(async () => {
 
         return globalClearRecycleScheduler;
     };
+
+    // 设置签到任务
+    const setupSignInTaskScheduler = async()=>{
+        // 如果已存在全局定时任务，先停止
+        if (globalSignInTaskScheduler) {
+            globalSignInTaskScheduler.stop();
+            console.log('已停止旧的签到定时任务');
+        } 
+
+        // 从配置中获取定时表达式，确保是有效的cron表达式
+        let enableSignInTask = await configService.getConfigValue('ENABLE_SIGN_IN_TASK', '0'); // 默认为0
+        if (enableSignInTask !== '1') {
+            console.log('签到任务已禁用');
+            return; // 如果禁用，直接返回
+        }
+        let signInInterval = await configService.getConfigValue('SIGN_IN_INTERVAL', '0 0 2 * * *'); // 每天2点执行
+        let execThreshold = await configService.getConfigValue('SIGN_IN_EXEC_THRESHOLD', '1'); // 签到并发数量 默认为1
+        let familiesValue = await configService.getConfigValue('SIGN_IN_FAMILIES', '');
+        let families = [];
+        
+        // 确保familiesValue是字符串类型再进行split操作
+        if (familiesValue && typeof familiesValue === 'string') {
+            families = familiesValue.split(',').filter(id => id.trim() !== '');
+        } else {
+            console.log('SIGN_IN_FAMILIES配置不是有效字符串，使用空数组作为默认值');
+        }
+        // 验证cron表达式是否有效，无效则使用默认值
+        try {
+         
+            if (!signInInterval ||
+               !signInInterval.trim() ||
+                signInInterval.split(' ').length < 5) {
+                console.warn('无效的签到cron表达式，使用默认值');
+                signInInterval = '0 0 2 * * *'; // 使用默认值
+            }  
+            // 测试cron表达式是否可以解析
+            validateCron(signInInterval);
+        }catch (error) {
+            console.error('签到cron表达式无效，使用默认值', error);
+            signInInterval = '0 0 2 * * *'; // 使用默认值
+        }
+        try {
+            // 创建新的定时任务
+            globalSignInTaskScheduler = cron.schedule(signInInterval, async () => {
+                console.log('执行定时签到任务...');
+                try {
+                    const accounts = await accountRepo.find();
+                    console.log(`找到${accounts.length}个账号进行签到任务`);
+                    const results = [];
+                    
+                    for (const account of accounts) {
+                        try {
+                            const cloud189 = Cloud189Service.getInstance(account);
+                            await taskService.cloudSignTask(cloud189, execThreshold, families);
+                            
+                            // 将用户名脱敏
+                            const maskedUsername = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
+                            results.push(`账号 ${maskedUsername} 签到成功`);
+                            
+                            // 延迟5秒
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        } catch (error) {
+                            console.error(`账号 ${account.id} 签到失败:`, error);
+                            const maskedUsername = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
+                            results.push(`账号 ${maskedUsername} 签到失败: ${error.message}`);
+                        }
+                    }
+                    
+                    // 发送通知
+                    if (results.length > 0) {
+                        messageUtil.sendMessage(`【自动签到】\n${results.join('\n')}`);
+                    }
+                } catch (error) {
+                    console.error('定时签到任务执行失败:', error);
+                }
+            }, {
+                scheduled: true,
+                timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
+            });
+            console.log('定时签到任务设置成功');
+            return globalSignInTaskScheduler;
+        } catch (error) {
+            console.error('设置定时签到任务失败:', error);
+            // 设置失败时返回null，不影响主程序运行
+            return null;
+        }
+    }
 
     // 设置定时删除指定文件夹下的多余文件任务
     const setupDeleteExtraFilesTaskScheduler = async()=>{
@@ -1115,6 +1217,9 @@ AppDataSource.initialize().then(async () => {
 
             // 标记是否需要重新设置删除指定文件夹下的文件
             let needResetDeleteExtraFilesTaskScheduler = false;
+
+            // 标记是否需要重新设置签到任务
+            let needResetSignInTaskScheduler = false;
             
             // 保存配置到数据库
             for (const config of configs) {
@@ -1178,6 +1283,10 @@ AppDataSource.initialize().then(async () => {
                 if(config.key=== 'DELETE_EXTRAFILES_INTERVAL'){
                     needResetDeleteExtraFilesTaskScheduler = true;
                 }
+
+                if(config.key === 'SIGN_IN_INTERVAL'){
+                    needResetSignInTaskScheduler = true;
+                }
             }
             
             // 更新缓存过期时间
@@ -1203,6 +1312,9 @@ AppDataSource.initialize().then(async () => {
             if (needResetDeleteExtraFilesTaskScheduler){
                 await setupDeleteExtraFilesTaskScheduler();
             }
+            if (needResetSignInTaskScheduler){
+                await setupSignInTaskScheduler();
+             }
             res.json({ success: true });
         } catch (error) {
             console.error('更新系统设置失败:', error);
@@ -1251,6 +1363,58 @@ AppDataSource.initialize().then(async () => {
         }
     });
 
+    // 天翼云盘签到API
+    app.post('/api/cloud189/sign-in', async (req, res) => {
+        try {
+            // 获取并发数和家庭ID列表
+            const execThreshold = req.body.execThreshold || 1;
+            const families = req.body.families || [];
+            
+            console.log(`执行立即签到，并发数：${execThreshold}，家庭ID：${families.join(',')}`);
+            
+            const accounts = await accountRepo.find();
+            if (!accounts || accounts.length === 0) {
+                return res.json({ success: false, error: '未找到任何账号' });
+            }
+            
+            console.log(`找到${accounts.length}个账号进行签到任务`);
+            
+            // 签到结果汇总
+            const results = [];
+            
+            for (const account of accounts) {
+                try {
+                    const cloud189 = Cloud189Service.getInstance(account);
+                    const result = await taskService.cloudSignTask(cloud189, execThreshold, families);
+                    
+                    // 将用户名脱敏
+                    const maskedUsername = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
+                    results.push(`账号 ${maskedUsername} 签到成功`);
+                    
+                    // 延迟5秒
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                } catch (error) {
+                    console.error(`账号 ${account.id} 签到失败:`, error);
+                    results.push(`账号 ${account.id} 签到失败: ${error.message}`);
+                }
+            }
+            
+            // 发送通知
+            if (results.length > 0) {
+                messageUtil.sendMessage(`【手动触发签到】\n${results.join('\n')}`);
+            }
+            
+            return res.json({ 
+                success: true, 
+                message: `共${accounts.length}个账号，成功：${results.filter(r => r.includes('成功')).length}，失败：${results.filter(r => r.includes('失败')).length}`,
+                details: results
+            });
+        } catch (error) {
+            console.error('立即签到失败:', error);
+            return res.status(500).json({ success: false, error: `签到失败: ${error.message}` });
+        }
+    });
+
     // 启动服务器
     const port = process.env.PORT || 3000;
     app.listen(port, async () => {
@@ -1263,6 +1427,8 @@ AppDataSource.initialize().then(async () => {
         await setupClearRecycleTaskScheduler();
         // 设置删除指定文件夹下的文件定时任务
         await setupDeleteExtraFilesTaskScheduler();
+        // 设置签到任务
+        await setupSignInTaskScheduler();
     });
 }).catch(error => {
     console.error('数据库连接失败:', error);

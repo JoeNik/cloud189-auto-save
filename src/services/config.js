@@ -14,6 +14,11 @@ class ConfigService {
             { key: 'ENABLE_AUTO_CLEAR_RECYCLE', value: '0', description: '清理个人空间(0:不清理 1:清理)' },
             { key: 'ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', value: '0', description: '清理家庭空间(0:不清理 1:清理)' },
             { key: 'DELETE_EXTRAFILES_INTERVAL', value: '0 23 * * * *', description: '删除指定文件夹下文件任务执行间隔（Cron表达式）' },
+            { key: 'ENABLE_SIGN_IN_TASK',value:'0',description:'签到任务(0:不开启 1:开启)'},
+            { key: 'SIGN_IN_INTERVAL',value:'0 0 7 * * *',description:'签到任务执行间隔（Cron表达式）'},
+            { key: 'SIGN_IN_EXEC_THRESHOLD',value:'1',description:'签到并发数，默认1'},
+            { key: 'SIGN_IN_FAMILIES',value:'',description:'家庭列表 逗号隔开）'},
+
         ];
     }
 

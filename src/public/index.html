@@ -342,6 +342,40 @@
                         <input type="text" id="deleteExtraFilesInterval" name="DELETE_EXTRAFILES_INTERVAL" placeholder="Cron表达式，例如：0 23 * * * *">
                         <small>默认：0 23 * * * *</small>
                     </div>
+
+                    <!-- 签到相关设置 -->
+                    <h3>签到设置</h3>
+                    <div class="form-group">
+                        <label>启用签到</label>
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="Enable_Sign_In_Task"
+                                name="ENABLE_SIGN_IN_TASK" value="0">
+                            <label class="custom-control-label" for="Enable_Sign_In_Task">开关</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="signInInterval">签到定时表达式</label>
+                        <input type="text" id="signInInterval" name="SIGN_IN_INTERVAL" placeholder="Cron表达式，例如：0 0 8 * * *">
+                        <small>默认：每天早上8点执行一次（0 0 8 * * *）</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="signInExecThreshold">签到并发数</label>
+                        <input type="number" id="signInExecThreshold" name="SIGN_IN_EXEC_THRESHOLD" placeholder="并发执行数量" value="1" min="1">
+                        <small>同时执行签到的账号数量，默认为1</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="signInFamilies">家庭ID</label>
+                        <input type="text" id="signInFamilies" name="SIGN_IN_FAMILIES" placeholder="多个家庭ID用英文逗号分隔">
+                        <small>要签到的家庭ID，多个ID之间用英文逗号分隔</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="button" id="signInNow" class="btn-primary">立即签到</button>
+                        <small id="signInStatus"></small>
+                    </div>
                     
                     <div class="form-actions">
                         <button type="submit">保存配置</button>
