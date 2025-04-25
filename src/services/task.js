@@ -35,7 +35,7 @@ class TaskService {
     }
 
     // 从文件名中提取集数
-    _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex) {
+    _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex,existingFilesNames = []) {
         console.log(`开始解析 ${fileName} 的集数,正则: ${episodeRegex},是否使用正则: ${episodeUseRegex}`);
 
         // 如果不使用正则表达式
@@ -49,6 +49,14 @@ class TaskService {
                 console.log('[自定义正则] 使用自定义正则表达式解析集数')
                 const regex = new RegExp(episodeRegex);
                 const match = fileName.match(regex);
+
+                // const existingFileNumbers = new Set(existingFilesNames.map(fname => {
+                //     const match = fname.match(regex);
+                //     return match && match[1] ? parseInt(match[1]) : null;
+                // }).filter(number => number !== null));
+                // console.log(`[自定义正则] 下 已存在的文件集数: ${[...existingFileNumbers]} `);
+
+                // if (match && match[1] && existingFileNumbers.has(parseInt(match[1]))) {
                 if (match && match[1]) {
                     return parseInt(match[1]);
                 }
@@ -106,7 +114,7 @@ class TaskService {
     }
 
     // 检查文件是否需要转存
-    _shouldSaveFile(fileName, task) {
+    _shouldSaveFile(fileName, task,existingFilesNames = []) {
         // 首先检查黑白名单
         if (!this._checkFileNameFilters(fileName, task)) {
             return false;
@@ -365,6 +373,11 @@ class TaskService {
                     .filter(file => !file.isFolder)
                     .map(file => file.md5)
             );
+            // existingFilesNames = new Set(
+            //     folderFiles
+            //        .filter(file =>!file.isFolder)
+            //        .map(file => file.name)
+            // );
             const newFiles = shareFiles
                 .filter(file => !file.isFolder && !existingFiles.has(file.md5))
                 .filter(file => this._shouldSaveFile(file.name, task));
