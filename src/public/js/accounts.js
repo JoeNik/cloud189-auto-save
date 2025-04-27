@@ -34,9 +34,9 @@ async function fetchAccounts() {
                         <td>${account.id}</td>
                         <td>${account.username}</td>
                         <td>${cloudSize}<br>${familySize}</td>
-                        <td>
-                            <button onclick="deleteAccount(${account.id})">删除</button>
-                        </td>
+                       <td>${account.cookies && !account.password ? 
+                         `<button class="btn-warning" onclick="updateCookie(${account.id})">修改Cookie</button>` 
+                         : ''}<button class="btn-danger" onclick="deleteAccount(${account.id})">删除</button></td>
                     </tr>
                 `;
                 select.innerHTML += `
@@ -78,6 +78,16 @@ async function initAccountForm() {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
+        const cookies  = document.getElementById('cookies').value;
+
+        if (!username ) {
+            alert('用户名不能为空');
+            return;
+        }
+        if (!password && !cookies) {
+            alert('密码和Cookie不能同时为空');
+            return;
+        }
     
         try {
             // 先获取加密密钥
@@ -101,7 +111,8 @@ async function initAccountForm() {
                     encryptionData: {
                         timestamp: keyData.timestamp,
                         keyId: keyData.keyId
-                    }
+                    },
+                    cookies
                 })
             });
     
@@ -120,6 +131,25 @@ async function initAccountForm() {
     });
 }
 
+// 更新 cookie
+async function updateCookie(id) {
+    const newCookie = prompt('请输入新的Cookie');
+    if (!newCookie) return;
+
+    const response = await fetch(`/api/accounts/${id}/cookie`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cookie: newCookie })
+    });
+
+    const data = await response.json();
+    if (data.success) {
+        alert('Cookie更新成功');
+        fetchAccounts();
+    } else {
+        alert('Cookie更新失败: ' + data.error);
+    }
+}
 // 刷新账号下拉选择框
 async function refreshAccountSelect() {
     try {

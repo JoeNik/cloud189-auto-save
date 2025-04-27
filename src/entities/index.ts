@@ -12,6 +12,9 @@ export class Account {
     @Column()
     password!: string;
 
+    @Column({ nullable: true })
+    cookies!: string;
+
     @CreateDateColumn()
     createdAt!: Date;
 

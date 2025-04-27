@@ -13,12 +13,18 @@ class Cloud189Service {
     }
 
     constructor(account) {
-        this.client = new CloudClient({ 
+
+        const _options = {
             username: account.username,
             password: account.password,
             token: new FileTokenStore(`data/${account.username}.json`)
-            }
-        );
+        }
+        if (!account.password && account.cookies) {
+            _options.ssonCookie = account.cookies
+            _options.password = null   
+        }
+
+        this.client = new CloudClient(_options);
     }
 
     // 解析分享链接获取文件信息

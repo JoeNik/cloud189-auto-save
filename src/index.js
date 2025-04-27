@@ -314,7 +314,7 @@ AppDataSource.initialize().then(async () => {
 
     app.post('/api/accounts', async (req, res) => {
         try {
-            const { username, password, encryptionData } = req.body;
+            const { username, password, encryptionData,cookie } = req.body;
             
             if (!encryptionData || !encryptionData.keyId || !encryptionData.timestamp) {
                 return res.status(400).json({ 
@@ -348,7 +348,8 @@ AppDataSource.initialize().then(async () => {
             // 创建账号数据,直接使用解密后的密码
             const accountData = { 
                 username,
-                password: decryptedPassword // 直接使用解密后的密码
+                password: decryptedPassword, // 直接使用解密后的密码
+                cookies: cookie,
             };
             
             // 保存账号
@@ -363,6 +364,21 @@ AppDataSource.initialize().then(async () => {
             res.json({ success: false, error: error.message });
         }
     });
+
+    // 修改账号cookie
+    app.put('/api/accounts/:id/cookie', async (req, res) => {
+        try {
+            const accountId = parseInt(req.params.id);
+            const { cookie } = req.body;
+            const account = await accountRepo.findOneBy({ id: accountId });
+            if (!account) throw new Error('账号不存在');
+            account.cookies = cookie;
+            await accountRepo.save(account);
+            res.json({ success: true });
+        } catch (error) {
+            res.json({ success: false, error: error.message });
+        }
+    })
 
     app.delete('/api/accounts/:id', async (req, res) => {
         try {
