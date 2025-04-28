@@ -314,7 +314,7 @@ AppDataSource.initialize().then(async () => {
 
     app.post('/api/accounts', async (req, res) => {
         try {
-            const { username, password, encryptionData,cookie } = req.body;
+            const { username, password, encryptionData,cookies } = req.body;
             
             if (!encryptionData || !encryptionData.keyId || !encryptionData.timestamp) {
                 return res.status(400).json({ 
@@ -349,7 +349,7 @@ AppDataSource.initialize().then(async () => {
             const accountData = { 
                 username,
                 password: decryptedPassword, // 直接使用解密后的密码
-                cookies: cookie,
+                cookies: cookies,
             };
             
             // 保存账号
