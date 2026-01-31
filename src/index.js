@@ -380,6 +380,52 @@ AppDataSource.initialize().then(async () => {
         }
     })
 
+    // 修改账号ID
+    app.put('/api/accounts/:id/id', async (req, res) => {
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            const oldId = parseInt(req.params.id);
+            const { newId } = req.body;
+
+            if (!newId || isNaN(newId)) {
+                throw new Error('新的账号ID无效');
+            }
+
+            if (oldId === newId) {
+                return res.json({ success: true });
+            }
+
+            // 检查新ID是否已存在
+            const existing = await accountRepo.findOneBy({ id: newId });
+            if (existing) {
+                throw new Error('该账号ID已存在');
+            }
+
+            const account = await accountRepo.findOneBy({ id: oldId });
+            if (!account) {
+                throw new Error('账号不存在');
+            }
+
+            // 更新Account ID (直接使用SQL以规避ORM的限制)
+            await queryRunner.query('UPDATE account SET id = ? WHERE id = ?', [newId, oldId]);
+
+            // 更新Task accountId
+            await queryRunner.query('UPDATE task SET accountId = ? WHERE accountId = ?', [newId, oldId]);
+
+            await queryRunner.commitTransaction();
+            res.json({ success: true });
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            console.error('修改账号ID失败:', error);
+            res.json({ success: false, error: error.message });
+        } finally {
+            await queryRunner.release();
+        }
+    });
+
     app.delete('/api/accounts/:id', async (req, res) => {
         try {
             const account = await accountRepo.findOneBy({ id: parseInt(req.params.id) });

@@ -8,11 +8,11 @@ async function fetchAccounts() {
             const select = document.querySelector('#accountId');
             tbody.innerHTML = '';
             select.innerHTML = '';
-            
+
             data.data.forEach(account => {
                 let cloudSize = '未知';
                 let familySize = '';
-                
+
                 // 格式化云盘容量信息
                 if (account.capacity && account.capacity.cloudCapacityInfo) {
                     const info = account.capacity.cloudCapacityInfo;
@@ -20,7 +20,7 @@ async function fetchAccounts() {
                     const total = formatFileSize(info.totalSize);
                     cloudSize = `${used} / ${total}`;
                 }
-                
+
                 // 格式化家庭云容量信息
                 if (account.capacity && account.capacity.familyCapacityInfo) {
                     const info = account.capacity.familyCapacityInfo;
@@ -28,15 +28,17 @@ async function fetchAccounts() {
                     const total = formatFileSize(info.totalSize);
                     familySize = `家庭云: ${used} / ${total}`;
                 }
-                
+
                 tbody.innerHTML += `
                     <tr>
                         <td>${account.id}</td>
                         <td>${account.username}</td>
                         <td>${cloudSize}<br>${familySize}</td>
-                       <td>${account.cookies && !account.password ? 
-                         `<button class="btn-warning" onclick="updateCookie(${account.id})">修改Cookie</button>` 
-                         : ''}<button class="btn-danger" onclick="deleteAccount(${account.id})">删除</button></td>
+                       <td>
+                          <button class="btn-info" onclick="updateAccountId(${account.id})" style="margin-right: 5px;">修改ID</button>
+                          ${account.cookies && !account.password ?
+                        `<button class="btn-warning" onclick="updateCookie(${account.id})" style="margin-right: 5px;">修改Cookie</button>`
+                        : ''}<button class="btn-danger" onclick="deleteAccount(${account.id})">删除</button></td>
                     </tr>
                 `;
                 select.innerHTML += `
@@ -78,9 +80,9 @@ async function initAccountForm() {
         e.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
-        const cookies  = document.getElementById('cookies').value;
+        const cookies = document.getElementById('cookies').value;
 
-        if (!username ) {
+        if (!username) {
             alert('用户名不能为空');
             return;
         }
@@ -88,25 +90,25 @@ async function initAccountForm() {
             alert('密码和Cookie不能同时为空');
             return;
         }
-    
+
         try {
             // 先获取加密密钥
             const keyResponse = await fetch('/api/auth/encryption-key');
             const keyData = await keyResponse.json();
-            
+
             if (!keyData.success) {
                 alert('获取加密密钥失败: ' + (keyData.error || '未知错误'));
                 return;
             }
-            
+
             // 使用新的加密函数加密密码
             const encryptedPassword = encryptPassword(password, keyData.publicKey, keyData.timestamp);
-            
+
             const response = await fetch('/api/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    username, 
+                body: JSON.stringify({
+                    username,
                     password: encryptedPassword,
                     encryptionData: {
                         timestamp: keyData.timestamp,
@@ -115,7 +117,7 @@ async function initAccountForm() {
                     cookies
                 })
             });
-    
+
             const data = await response.json();
             if (data.success) {
                 document.getElementById('accountForm').reset();
@@ -150,16 +152,46 @@ async function updateCookie(id) {
         alert('Cookie更新失败: ' + data.error);
     }
 }
+
+// 修改账号ID
+async function updateAccountId(id) {
+    const newId = prompt('请输入新的账号ID (请确保ID唯一且为数字)');
+    if (!newId) return;
+
+    if (isNaN(newId)) {
+        alert('账号ID必须是数字');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/accounts/${id}/id`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newId: parseInt(newId) })
+        });
+        const data = await response.json();
+        if (data.success) {
+            toast.success('账号ID修改成功');
+            await fetchAccounts();
+            refreshAccountSelect();
+        } else {
+            toast.error('修改失败: ' + data.error);
+        }
+    } catch (e) {
+        toast.error('请求失败: ' + e.message);
+    }
+}
+
 // 刷新账号下拉选择框
 async function refreshAccountSelect() {
     try {
         const response = await fetch('/api/accounts');
         const data = await response.json();
-    
+
         if (data.success) {
             const accountSelect = document.getElementById('accountId');
             accountSelect.innerHTML = '';
-    
+
             data.data.forEach(account => {
                 const option = document.createElement('option');
                 option.value = account.id;
