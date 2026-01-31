@@ -488,7 +488,7 @@ class TaskService {
             'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
             'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
             'episodeThreshold', 'episodeRegex','episodeUseRegex','maxKeepSaveFile', 'whitelistKeywords', 'blacklistKeywords',
-            'cronExpression'
+            'cronExpression', 'shareLink', 'accessCode', 'accountId', 'shareId', 'shareFileId', 'shareMode'
         ];
         for (const field of allowedFields) {
             if (updates[field] !== undefined) {

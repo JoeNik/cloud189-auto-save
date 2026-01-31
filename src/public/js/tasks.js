@@ -1,13 +1,13 @@
 // 任务相关功能
 function createProgressRing(current, total) {
     if (!total) return '';
-    
+
     const radius = 12;
     const circumference = 2 * Math.PI * radius;
     const progress = (current / total) * 100;
     const offset = circumference - (progress / 100) * circumference;
     const percentage = Math.round((current / total) * 100);
-    
+
     return `
         <div class="progress-ring">
             <svg width="30" height="30">
@@ -57,16 +57,16 @@ async function fetchTasks() {
                         <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                          ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, 
                          '${task.status}','${task.shareLink}', '${task.accessCode}', '${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.targetFolderName}', 
-                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex},'${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}')">修改</button>
+                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex},'${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}', ${task.accountId})">修改</button>
                     </td>
-                    <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName?(task.resourceName + '/' + task.shareFolderName): task.resourceName || '未知'}</a></td>
+                    <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>
                     <td data-label="首次保存目录"><a href="https://cloud.189.cn/web/main/file/folder/${task.targetFolderId}" target="_blank">${task.targetFolderId}</a></td>
                     <td data-label="更新目录"><a href="javascript:void(0)" onclick="showFileListModal('${task.id}')">${task.targetFolderName || task.targetFolderId}</a></td>
                     <td data-label="截止集数">${task.episodeThreshold || 0}</td>
                     <td data-label="更新数/总数">${task.currentEpisodes || 0}/${task.totalEpisodes || '未知'}${progressRing}</td>
                     <td data-label="定时任务">${task.cronExpression || '默认'}</td>
-                    <td data-label="使用正则匹配">${task.episodeUseRegex == 1 ? '是':'否'}</td>
+                    <td data-label="使用正则匹配">${task.episodeUseRegex == 1 ? '是' : '否'}</td>
                     <td data-label="状态"><span class="status-badge status-${task.status}">${task.status}</span></td>
                 </tr>
             `;
@@ -74,8 +74,8 @@ async function fetchTasks() {
     }
 }
 
- // 删除任务
- async function deleteTask(id) {
+// 删除任务
+async function deleteTask(id) {
     if (!confirm('确定要删除这个任务吗？')) return;
 
     const response = await fetch(`/api/tasks/${id}`, {
@@ -125,20 +125,20 @@ function initTaskForm() {
         const submitBtn = e.target.querySelector('button[type="submit"]');
         submitBtn.classList.add('loading');
         submitBtn.disabled = true;
-    
+
         try {
             const accountId = document.getElementById('accountId').value;
             const shareLink = document.getElementById('shareLink').value;
             const totalEpisodes = document.getElementById('totalEpisodes').value;
             const targetFolderId = document.getElementById('targetFolderId').value;
             const accessCode = document.getElementById('accessCode').value;
-    
+
             const response = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ accountId, shareLink, totalEpisodes, targetFolderId, accessCode })
             });
-    
+
             const data = await response.json();
             if (data.success) {
                 if (data.needFolderSelection) {
@@ -172,7 +172,7 @@ async function showFileListModal(taskId) {
     const folderId = chooseTask.targetFolderId;
     // 创建弹窗
     const modal = document.createElement('div');
-    modal.className = 'modal files-list-modal'; 
+    modal.className = 'modal files-list-modal';
     modal.innerHTML = `
         <div class="modal-content" style="width: 80%; max-width: 1000px;">
             <h2>文件列表</h2>
@@ -220,8 +220,8 @@ async function showFileListModal(taskId) {
 }
 // 显示批量重命名选项
 function showBatchRenameOptions() {
-    const sourceRegex = escapeHtmlAttr(chooseTask.sourceRegex)?? ''
-    const targetRegex = escapeHtmlAttr(chooseTask.targetRegex)?? ''
+    const sourceRegex = escapeHtmlAttr(chooseTask.sourceRegex) ?? ''
+    const targetRegex = escapeHtmlAttr(chooseTask.targetRegex) ?? ''
     const selectedFiles = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.filename);
     if (selectedFiles.length === 0) {
         toast.error('请选择要重命名的文件');
@@ -325,7 +325,7 @@ async function previewRename(autoUpdate = false) {
         const nameFormat = document.getElementById('newNameFormat').value;
         const startNum = parseInt(document.getElementById('startNumber').value);
         const padLength = document.getElementById('startNumber').value.length;
-        
+
         newNames = selectedFiles.map((filename, index) => {
             const checkbox = document.querySelector(`.file-checkbox[data-filename="${filename}"]`);
             const ext = filename.split('.').pop();
@@ -390,14 +390,14 @@ async function submitRename(autoUpdate) {
         return
     }
     if (autoUpdate) {
-        if (!confirm('当前选择的是自动更新, 请确认正则表达式是否正确, 否则后续的文件可能无法正确重命名')){
+        if (!confirm('当前选择的是自动更新, 请确认正则表达式是否正确, 否则后续的文件可能无法正确重命名')) {
             return;
         }
     }
     const accountId = chooseTask.accountId;
     const taskId = chooseTask.id;
-    const sourceRegex = autoUpdate ? escapeRegExp(document.getElementById('sourceRegex').value): null;
-    const targetRegex = autoUpdate ? escapeRegExp(document.getElementById('targetRegex').value): null;
+    const sourceRegex = autoUpdate ? escapeRegExp(document.getElementById('sourceRegex').value) : null;
+    const targetRegex = autoUpdate ? escapeRegExp(document.getElementById('targetRegex').value) : null;
     try {
         const response = await fetch('/api/files/rename', {
             method: 'POST',
@@ -407,8 +407,8 @@ async function submitRename(autoUpdate) {
         const data = await response.json();
         if (data.success) {
             if (data.data && data.data.length > 0) {
-                toast.warning('部分文件重命名失败:'+ data.data.join(', '));
-            }else{
+                toast.warning('部分文件重命名失败:' + data.data.join(', '));
+            } else {
                 toast.success('重命名成功');
             }
             closeRenamePreviewModal();
@@ -463,7 +463,7 @@ function closeRenamePreviewModal() {
 
 // 处理反斜杠
 function escapeRegExp(regexStr) {
-    return regexStr?regexStr.replace(/\\\\/g, '\\'):'';
+    return regexStr ? regexStr.replace(/\\\\/g, '\\') : '';
 }
 
 // 转义HTML属性中的特殊字符

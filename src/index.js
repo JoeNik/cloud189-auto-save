@@ -61,18 +61,18 @@ AppDataSource.initialize().then(async () => {
     const taskRepo = AppDataSource.getRepository(Task);
     const taskLogRepo = AppDataSource.getRepository(TaskLog);
     const configRepo = AppDataSource.getRepository(SystemConfig);
-    
+
     // 初始化配置服务
     const configService = new ConfigService(configRepo);
     await configService.initDefaultConfig();
-    
+
     // 初始化消息服务
     const messageUtil = new MessageUtil();
     await messageUtil.initialize();
-    
+
     // 初始化任务服务，传入配置服务
     const taskService = new TaskService(taskRepo, accountRepo, taskLogRepo, configService);
-    
+
     // 初始化缓存管理器
     const folderCacheTTL = await configService.getConfigValue('FOLDER_CACHE_TTL', '600');
     const folderCache = new CacheManager(parseInt(folderCacheTTL));
@@ -80,7 +80,7 @@ AppDataSource.initialize().then(async () => {
     // 初始化session存储
     const sessionRepository = AppDataSource.getRepository(Session);
     const sessionStore = new CustomSessionStore(sessionRepository);
-    
+
     // 配置session中间件
     app.use(session({
         name: 'cloud189.sid',
@@ -100,12 +100,12 @@ AppDataSource.initialize().then(async () => {
     // 添加会话调试中间件
     app.use((req, res, next) => {
         const oldSave = req.session.save;
-        req.session.save = function(cb) {
+        req.session.save = function (cb) {
             // console.log('保存会话:', {
             //     id: req.sessionID,
             //     data: req.session
             // });
-            return oldSave.call(req.session, function(err) {
+            return oldSave.call(req.session, function (err) {
                 if (err) {
                     console.error('会话保存错误:', err);
                 }
@@ -114,22 +114,22 @@ AppDataSource.initialize().then(async () => {
         };
         next();
     });
-    
+
     // 检查登录状态API - 必须在session中间件之后
     app.get('/api/auth/check', (req, res) => {
         if (req.session.user) {
-            res.json({ 
-                success: true, 
-                data: { 
+            res.json({
+                success: true,
+                data: {
                     username: req.session.user.username,
                     loginTime: req.session.user.loginTime
-                } 
+                }
             });
         } else {
             res.status(401).json({ success: false, error: '未登录或会话已过期' });
         }
     });
-    
+
     // 登录验证挑战（生成随机盐值）
     app.post('/api/auth/challenge', (req, res) => {
         const { username } = req.body;
@@ -145,17 +145,17 @@ AppDataSource.initialize().then(async () => {
             username,
             expires: timestamp + 5 * 60 * 1000 // 5分钟有效期
         };
-        
+
         // 确保会话保存
         req.session.save(err => {
             if (err) {
                 console.error('保存会话失败:', err);
-                return res.status(500).json({ 
-                    success: false, 
-                    error: '会话保存失败' 
+                return res.status(500).json({
+                    success: false,
+                    error: '会话保存失败'
                 });
             }
-            
+
             res.json({
                 success: true,
                 salt,
@@ -163,11 +163,11 @@ AppDataSource.initialize().then(async () => {
             });
         });
     });
-    
+
     // 登录接口
     app.post('/api/login', async (req, res) => {
         const { username, password, salt, timestamp, remember } = req.body;
-        
+
         // 检查会话是否存在
         if (!req.session) {
             return res.status(500).json({
@@ -175,19 +175,19 @@ AppDataSource.initialize().then(async () => {
                 error: '会话初始化失败'
             });
         }
-        
+
         // 检查挑战是否有效
         const challenge = req.session.loginChallenge;
         console.log('登录挑战信息:', challenge);
-        
-        if (!challenge || 
-            challenge.salt !== salt || 
+
+        if (!challenge ||
+            challenge.salt !== salt ||
             challenge.timestamp !== timestamp ||
-            challenge.username !== username || 
+            challenge.username !== username ||
             challenge.expires < Date.now()) {
-            
-            return res.status(401).json({ 
-                success: false, 
+
+            return res.status(401).json({
+                success: false,
                 error: '登录挑战无效或已过期，请重新登录'
             });
         }
@@ -198,11 +198,11 @@ AppDataSource.initialize().then(async () => {
 
         // 在服务器端计算预期的密码哈希
         const expectedHash = cryptoUtil.hashChallengePassword(
-            configPassword, 
-            salt, 
+            configPassword,
+            salt,
             timestamp
         );
-        
+
         // 验证用户名和密码
         if (username === configUsername && password === expectedHash) {
             // 设置session
@@ -226,19 +226,19 @@ AppDataSource.initialize().then(async () => {
             req.session.save(err => {
                 if (err) {
                     console.error('保存会话失败2:', err);
-                    return res.status(500).json({ 
-                        success: false, 
-                        error: '会话保存失败' 
+                    return res.status(500).json({
+                        success: false,
+                        error: '会话保存失败'
                     });
                 }
-                
+
                 res.json({ success: true });
             });
         } else {
             res.status(401).json({ success: false, error: '用户名或密码错误' });
         }
     });
-    
+
     // 登出接口
     app.post('/api/logout', (req, res) => {
         req.session.destroy(err => {
@@ -249,14 +249,14 @@ AppDataSource.initialize().then(async () => {
             res.json({ success: true });
         });
     });
-    
+
     // 提供临时加密密钥的端点
     app.get('/api/auth/encryption-key', (req, res) => {
         // 生成临时密钥和ID
         const keyId = crypto.randomBytes(8).toString('hex');
         const publicKey = crypto.randomBytes(16).toString('hex');
         const timestamp = Date.now();
-        
+
         // 存储密钥信息到会话中，服务器端会用这个解密
         req.session.encryptionKeys = req.session.encryptionKeys || {};
         req.session.encryptionKeys[keyId] = {
@@ -264,14 +264,14 @@ AppDataSource.initialize().then(async () => {
             timestamp,
             expires: timestamp + 10 * 60 * 1000 // 10分钟过期
         };
-        
+
         // 清理过期的密钥
         for (const id in req.session.encryptionKeys) {
             if (req.session.encryptionKeys[id].expires < Date.now()) {
                 delete req.session.encryptionKeys[id];
             }
         }
-        
+
         res.json({
             success: true,
             publicKey,
@@ -314,51 +314,51 @@ AppDataSource.initialize().then(async () => {
 
     app.post('/api/accounts', async (req, res) => {
         try {
-            const { username, password, encryptionData,cookies } = req.body;
-            
+            const { username, password, encryptionData, cookies } = req.body;
+
             if (!encryptionData || !encryptionData.keyId || !encryptionData.timestamp) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: '请求缺少必要的加密信息' 
+                return res.status(400).json({
+                    success: false,
+                    error: '请求缺少必要的加密信息'
                 });
             }
-            
+
             // 验证加密密钥是否有效
             const { keyId, timestamp } = encryptionData;
             const keyInfo = req.session.encryptionKeys && req.session.encryptionKeys[keyId];
-            
+
             if (!keyInfo || keyInfo.expires < Date.now()) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: '加密密钥无效或已过期' 
+                return res.status(400).json({
+                    success: false,
+                    error: '加密密钥无效或已过期'
                 });
             }
-            
+
             // 使用临时公钥解密
             let decryptedPassword;
             try {
                 decryptedPassword = cryptoUtil.aesDecrypt(password, keyInfo.publicKey);
             } catch (e) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: '密码解密失败' 
+                return res.status(400).json({
+                    success: false,
+                    error: '密码解密失败'
                 });
             }
-            
+
             // 创建账号数据,直接使用解密后的密码
-            const accountData = { 
+            const accountData = {
                 username,
                 password: decryptedPassword, // 直接使用解密后的密码
                 cookies: cookies,
             };
-            
+
             // 保存账号
             const account = accountRepo.create(accountData);
             await accountRepo.save(account);
-            
+
             // 清除已使用的加密密钥
             delete req.session.encryptionKeys[keyId];
-            
+
             res.json({ success: true, data: account });
         } catch (error) {
             res.json({ success: false, error: error.message });
@@ -409,7 +409,7 @@ AppDataSource.initialize().then(async () => {
     app.post('/api/tasks', async (req, res) => {
         try {
             const { accountId, shareLink, targetFolderId, totalEpisodes, accessCode, selectedFolders, resourceName } = req.body;
-            
+
             // 如果提供了选中的文件夹列表，为每个文件夹创建任务
             if (selectedFolders && selectedFolders.length > 0) {
                 const tasks = [];
@@ -440,19 +440,19 @@ AppDataSource.initialize().then(async () => {
                 if (!result?.fileListAO?.folderList) {
                     throw new Error('获取文件夹列表失败');
                 }
-                
+
                 if (result.fileListAO.folderList.length > 0) {
                     // 返回文件夹列表供前端选择
-                    res.json({ 
-                        success: true, 
+                    res.json({
+                        success: true,
                         needFolderSelection: true,
                         shareInfo,
-                        folders: result.fileListAO.folderList 
+                        folders: result.fileListAO.folderList
                     });
                     return;
                 }
             }
-            
+
             // 如果没有子文件夹，创建单个任务
             const task = await taskService.createTask(accountId, shareLink, targetFolderId, totalEpisodes, accessCode);
             res.json({ success: true, data: task });
@@ -465,7 +465,7 @@ AppDataSource.initialize().then(async () => {
     const taskSchedulers = new Map();
     // 存储全局定时任务
     let globalTaskScheduler = null;
-    
+
     // 存储清理任务的定时器
     let globalClearRecycleScheduler = null;
 
@@ -474,7 +474,7 @@ AppDataSource.initialize().then(async () => {
 
     // 存储签到任务的定时器
     let globalSignInTaskScheduler = null;
-    
+
     // 系统设置相关API
     app.get('/api/system/config', async (req, res) => {
         try {
@@ -488,15 +488,15 @@ AppDataSource.initialize().then(async () => {
                         ...config,
                         value: '********' // 替换为星号
                     };
-                }else if (config.key === 'SESSION_SECRET') {
+                } else if (config.key === 'SESSION_SECRET') {
                     return {
-                       ...config,
+                        ...config,
                         value: '' // 隐藏值
                     };
                 }
                 return config;
             });
-            
+
             res.json({ success: true, data: safeConfigs });
         } catch (error) {
             console.error('获取系统设置失败:', error);
@@ -505,8 +505,8 @@ AppDataSource.initialize().then(async () => {
     });
 
     // 设置定时清理回收站任务
-    const setupClearRecycleTaskScheduler = async()=>{
-       
+    const setupClearRecycleTaskScheduler = async () => {
+
         // 如果已存在全局定时任务，先停止
         if (globalClearRecycleScheduler) {
             globalClearRecycleScheduler.stop();
@@ -518,8 +518,8 @@ AppDataSource.initialize().then(async () => {
         // 验证cron表达式是否有效，无效则使用默认值
         try {
             // 简单验证cron表达式格式
-            if (!clearRecycleInterval || 
-                !clearRecycleInterval.trim() || 
+            if (!clearRecycleInterval ||
+                !clearRecycleInterval.trim() ||
                 clearRecycleInterval.split(' ').length < 5) {
                 console.warn('无效的清理回收站cron表达式，使用默认值');
                 clearRecycleInterval = '0 0 2 * * *'; // 使用默认值
@@ -530,8 +530,8 @@ AppDataSource.initialize().then(async () => {
             console.error('清理回收站cron表达式无效，使用默认值', error);
             clearRecycleInterval = '0 0 2 * * *'; // 使用默认值
         }
-        
-        const enableAutoClearRecycle = await configService.getConfigValue('ENABLE_AUTO_CLEAR_RECYCLE', '0'); 
+
+        const enableAutoClearRecycle = await configService.getConfigValue('ENABLE_AUTO_CLEAR_RECYCLE', '0');
         const enableAutoClearFamilyRecycle = await configService.getConfigValue('ENABLE_AUTO_CLEAR_FAMILY_RECYCLE', '0');
         console.log(`设置定时清理回收站任务: ${clearRecycleInterval}, 自动清理回收站: ${enableAutoClearRecycle}, 自动清理家庭回收站: ${enableAutoClearFamilyRecycle}`);
 
@@ -543,8 +543,8 @@ AppDataSource.initialize().then(async () => {
                     // 使用 bind 确保 this 上下文正确
                     await taskService.clearRecycleBin.bind(taskService)(enableAutoClearRecycle, enableAutoClearFamilyRecycle);
                 } catch (error) {
-                    console.error('定时清理回收站任务执行失败:', error); 
-                } 
+                    console.error('定时清理回收站任务执行失败:', error);
+                }
             }, {
                 scheduled: true,
                 timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
@@ -560,12 +560,12 @@ AppDataSource.initialize().then(async () => {
     };
 
     // 设置签到任务
-    const setupSignInTaskScheduler = async()=>{
+    const setupSignInTaskScheduler = async () => {
         // 如果已存在全局定时任务，先停止
         if (globalSignInTaskScheduler) {
             globalSignInTaskScheduler.stop();
             console.log('已停止旧的签到定时任务');
-        } 
+        }
 
         // 从配置中获取定时表达式，确保是有效的cron表达式
         let enableSignInTask = await configService.getConfigValue('ENABLE_SIGN_IN_TASK', '0'); // 默认为0
@@ -577,7 +577,7 @@ AppDataSource.initialize().then(async () => {
         let execThreshold = await configService.getConfigValue('SIGN_IN_EXEC_THRESHOLD', '1'); // 签到并发数量 默认为1
         let familiesValue = await configService.getConfigValue('SIGN_IN_FAMILIES', '');
         let families = [];
-        
+
         // 确保familiesValue是字符串类型再进行split操作
         if (familiesValue && typeof familiesValue === 'string') {
             families = familiesValue.split(',').filter(id => id.trim() !== '');
@@ -586,16 +586,16 @@ AppDataSource.initialize().then(async () => {
         }
         // 验证cron表达式是否有效，无效则使用默认值
         try {
-         
+
             if (!signInInterval ||
-               !signInInterval.trim() ||
+                !signInInterval.trim() ||
                 signInInterval.split(' ').length < 5) {
                 console.warn('无效的签到cron表达式，使用默认值');
                 signInInterval = '0 0 2 * * *'; // 使用默认值
-            }  
+            }
             // 测试cron表达式是否可以解析
             validateCron(signInInterval);
-        }catch (error) {
+        } catch (error) {
             console.error('签到cron表达式无效，使用默认值', error);
             signInInterval = '0 0 2 * * *'; // 使用默认值
         }
@@ -607,16 +607,16 @@ AppDataSource.initialize().then(async () => {
                     const accounts = await accountRepo.find();
                     console.log(`找到${accounts.length}个账号进行签到任务`);
                     const results = [];
-                    
+
                     for (const account of accounts) {
                         try {
                             const cloud189 = Cloud189Service.getInstance(account);
                             await taskService.cloudSignTask(cloud189, execThreshold, families);
-                            
+
                             // 将用户名脱敏
                             const maskedUsername = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
                             results.push(`账号 ${maskedUsername} 签到成功`);
-                            
+
                             // 延迟5秒
                             await new Promise(resolve => setTimeout(resolve, 5000));
                         } catch (error) {
@@ -625,7 +625,7 @@ AppDataSource.initialize().then(async () => {
                             results.push(`账号 ${maskedUsername} 签到失败: ${error.message}`);
                         }
                     }
-                    
+
                     // 发送通知
                     if (results.length > 0) {
                         messageUtil.sendMessage(`【自动签到】\n${results.join('\n')}`);
@@ -647,32 +647,32 @@ AppDataSource.initialize().then(async () => {
     }
 
     // 设置定时删除指定文件夹下的多余文件任务
-    const setupDeleteExtraFilesTaskScheduler = async()=>{
+    const setupDeleteExtraFilesTaskScheduler = async () => {
         // 如果已存在全局定时任务，先停止
         if (globalDeleteFileScheduler) {
             globalDeleteFileScheduler.stop();
             console.log('已停止旧的定时删除指定文件夹下的多余文件任务');
         }
 
-         // 从配置中获取定时表达式，确保是有效的cron表达式
-         let deleteExtraFilesInterval = await configService.getConfigValue('DELETE_EXTRAFILES_INTERVAL', '0 0 23 * * *'); // 每天23点执行
-         // 验证cron表达式是否有效，无效则使用默认值
-         try {
-             // 简单验证cron表达式格式
-             if (!deleteExtraFilesInterval || 
-                 !deleteExtraFilesInterval.trim() || 
-                 deleteExtraFilesInterval.split(' ').length < 5) {
-                 console.warn('无效的清理回收站cron表达式，使用默认值');
-                 deleteExtraFilesInterval = '0 0 2 * * *'; // 使用默认值
-             }
-             // 测试cron表达式是否可以解析
-             validateCron(deleteExtraFilesInterval);
-         } catch (error) {
-             console.error('清理删除指定文件夹文件cron表达式无效，使用默认值', error);
-             deleteExtraFilesInterval = '0 0 23 * * *'; // 使用默认值
-         }
+        // 从配置中获取定时表达式，确保是有效的cron表达式
+        let deleteExtraFilesInterval = await configService.getConfigValue('DELETE_EXTRAFILES_INTERVAL', '0 0 23 * * *'); // 每天23点执行
+        // 验证cron表达式是否有效，无效则使用默认值
+        try {
+            // 简单验证cron表达式格式
+            if (!deleteExtraFilesInterval ||
+                !deleteExtraFilesInterval.trim() ||
+                deleteExtraFilesInterval.split(' ').length < 5) {
+                console.warn('无效的清理回收站cron表达式，使用默认值');
+                deleteExtraFilesInterval = '0 0 2 * * *'; // 使用默认值
+            }
+            // 测试cron表达式是否可以解析
+            validateCron(deleteExtraFilesInterval);
+        } catch (error) {
+            console.error('清理删除指定文件夹文件cron表达式无效，使用默认值', error);
+            deleteExtraFilesInterval = '0 0 23 * * *'; // 使用默认值
+        }
 
-        try{
+        try {
             // 创建新的定时任务
             globalDeleteFileScheduler = cron.schedule(deleteExtraFilesInterval, async () => {
                 console.log('执行定时删除指定文件夹下的多余文件任务...');
@@ -689,7 +689,7 @@ AppDataSource.initialize().then(async () => {
                                 continue
                             }
                             const cloud189 = Cloud189Service.getInstance(account);
-                            const result = await taskService.processDeleteExtraFilesTask(cloud189,task);
+                            const result = await taskService.processDeleteExtraFilesTask(cloud189, task);
                             if (result) {
                                 saveResults.push(result);
                             }
@@ -701,16 +701,16 @@ AppDataSource.initialize().then(async () => {
                         messageUtil.sendMessage(saveResults.join("\n\n"));
                     }
                 } catch (error) {
-                    console.error('定时定时删除指定文件夹下的多余文件任务执行失败:', error); 
-                } 
+                    console.error('定时定时删除指定文件夹下的多余文件任务执行失败:', error);
+                }
             }, {
                 scheduled: true,
                 timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
             });
             console.log('定时定时删除指定文件夹下的多余文件任务设置成功');
 
-           
-        }catch (error) {
+
+        } catch (error) {
             console.error('设执行定时删除指定文件夹下的多余文件任务失败:', error);
             // 设置失败时返回null，不影响主程序运行
             return null;
@@ -724,15 +724,15 @@ AppDataSource.initialize().then(async () => {
             globalTaskScheduler.stop();
             console.log('已停止旧的全局定时任务');
         }
-        
+
         // 从数据库获取定时任务表达式
         let taskCheckInterval = await configService.getConfigValue('TASK_CHECK_INTERVAL', '0 */30 * * * *');
-        
+
         // 验证cron表达式是否有效，无效则使用默认值
         try {
             // 简单验证cron表达式格式
-            if (!taskCheckInterval || 
-                !taskCheckInterval.trim() || 
+            if (!taskCheckInterval ||
+                !taskCheckInterval.trim() ||
                 taskCheckInterval.split(' ').length < 5) {
                 console.warn('无效的全局任务cron表达式，使用默认值');
                 taskCheckInterval = '0 */30 * * * *'; // 使用默认值
@@ -743,20 +743,20 @@ AppDataSource.initialize().then(async () => {
             console.error('全局任务cron表达式无效，使用默认值', error);
             taskCheckInterval = '0 */30 * * * *'; // 使用默认值
         }
-        
+
         console.log(`设置全局定时任务，表达式: ${taskCheckInterval}`);
-        
+
         try {
             // 创建新的全局定时任务
             globalTaskScheduler = cron.schedule(taskCheckInterval, async () => {
                 console.log('执行全局定时任务检查...');
                 const tasks = await taskService.getPendingTasks();
                 let saveResults = [];
-                
+
                 // 只处理没有自定义cron表达式的任务
                 const defaultTasks = tasks.filter(task => !task.cronExpression);
                 console.log(`找到${defaultTasks.length}个使用全局定时任务的待处理任务`);
-                
+
                 for (const task of defaultTasks) {
                     try {
                         const result = await taskService.processTask(task);
@@ -767,7 +767,7 @@ AppDataSource.initialize().then(async () => {
                         console.error(`任务${task.id}执行失败:`, error);
                     }
                 }
-                
+
                 if (saveResults.length > 0) {
                     messageUtil.sendMessage(saveResults.join("\n\n"));
                 }
@@ -775,14 +775,14 @@ AppDataSource.initialize().then(async () => {
                 scheduled: true,
                 timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
             });
-            
+
             console.log('全局定时任务设置成功');
         } catch (error) {
             console.error('设置全局定时任务失败:', error);
             // 设置失败时返回null，不影响主程序运行
             return null;
         }
-        
+
         return globalTaskScheduler;
     };
 
@@ -795,21 +795,21 @@ AppDataSource.initialize().then(async () => {
             taskSchedulers.delete(task.id);
             console.log(`已停止任务[${task.id}]的旧定时任务`);
         }
-        
+
         // 如果任务有自定义cron表达式，创建新的定时任务
         if (task.cronExpression) {
             try {
                 // 验证cron表达式是否有效
-                if (!task.cronExpression || 
-                    !task.cronExpression.trim() || 
+                if (!task.cronExpression ||
+                    !task.cronExpression.trim() ||
                     task.cronExpression.split(' ').length < 5) {
                     console.warn(`任务[${task.id}]的cron表达式无效: ${task.cronExpression}`);
                     return;
                 }
-                
+
                 // 测试cron表达式是否可以解析
                 validateCron(task.cronExpression);
-                
+
                 const scheduler = cron.schedule(task.cronExpression, async () => {
                     console.log(`执行自定义定时任务[${task.id}]: ${task.resourceName}，cron表达式: ${task.cronExpression}`);
                     try {
@@ -824,7 +824,7 @@ AppDataSource.initialize().then(async () => {
                     scheduled: true,
                     timezone: "Asia/Shanghai" // 设置为北京时间(UTC+8)
                 });
-                
+
                 taskSchedulers.set(task.id, scheduler);
                 console.log(`已为任务[${task.id}]创建自定义定时任务，cron表达式: ${task.cronExpression}`);
             } catch (error) {
@@ -833,19 +833,19 @@ AppDataSource.initialize().then(async () => {
             }
         }
     };
-    
+
     // 初始化自定义定时任务
     const initCustomTaskSchedulers = async () => {
         console.log('初始化自定义定时任务...');
         const tasks = await taskService.getPendingTasks();
         const customTasks = tasks.filter(task => task.cronExpression);
         console.log(`找到${customTasks.length}个使用自定义定时任务的待处理任务`);
-        
+
         customTasks.forEach(task => {
             createOrUpdateTaskScheduler(task);
         });
     };
-    
+
     // 修改任务更新API，处理cron表达式变更
     app.put('/api/tasks/:id', async (req, res) => {
         try {
@@ -855,53 +855,97 @@ AppDataSource.initialize().then(async () => {
             //     body: req.body
             // });
 
-            const { 
-                resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
-                status, shareFolderName, shareFolderId, targetFolderName, 
-                episodeThreshold, episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
-                cronExpression 
+            const {
+                resourceName, targetFolderId, currentEpisodes, totalEpisodes,
+                status, shareFolderName, shareFolderId, targetFolderName,
+                episodeThreshold, episodeRegex, episodeUseRegex, maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
+                cronExpression, shareLink, accessCode, accountId
             } = req.body;
-            
+
+            // 获取原任务数据
+            const task = await taskRepo.findOneBy({ id: taskId });
+            if (!task) {
+                throw new Error('任务不存在');
+            }
+
             // 如果shareFolderId为"root",则获取原任务的shareFileId
-            let updates = { 
-                resourceName, targetFolderId, currentEpisodes, totalEpisodes, 
-                status, shareFolderName, targetFolderName, 
-                episodeThreshold, episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
-                cronExpression 
+            let updates = {
+                resourceName, targetFolderId, currentEpisodes, totalEpisodes,
+                status, shareFolderName, targetFolderName,
+                episodeThreshold, episodeRegex, episodeUseRegex, maxKeepSaveFile, whitelistKeywords, blacklistKeywords,
+                cronExpression, shareLink, accessCode, accountId
             };
 
-            if(shareFolderId === "root") {
-                // 获取原任务数据
-                const task = await taskRepo.findOneBy({ id: taskId });
-                if(!task) {
-                    throw new Error('任务不存在');
+            // 如果修改了分享链接，需要重新获取shareId等信息
+            if (shareLink && shareLink !== task.shareLink) {
+                // 获取账号信息（如果accountId也修改了，用新的，否则用旧的）
+                const targetAccountId = accountId || task.accountId;
+                const account = await accountRepo.findOneBy({ id: targetAccountId });
+                if (!account) {
+                    throw new Error('账号不存在');
                 }
-                // 使用原任务的shareFileId
-                updates.shareFolderId = task.shareFileId;
+
+                const cloud189 = Cloud189Service.getInstance(account);
+                const shareCode = await taskService.parseShareCode(shareLink);
+                // 如果修改了链接，且提供了新的访问码，使用新的；否则如果没提供，尝试使用旧的（虽然通常修改链接意味着新的访问码）
+                const targetAccessCode = accessCode !== undefined ? accessCode : task.accessCode;
+
+                // 获取分享信息
+                const shareInfo = await taskService.getShareInfo(cloud189, shareCode);
+
+                // 如果是加密分享，校验访问码
+                if (shareInfo.shareMode === 1) {
+                    if (!targetAccessCode) {
+                        throw new Error('分享链接为加密链接, 请提供访问码');
+                    }
+                    const accessCodeResponse = await cloud189.checkAccessCode(shareCode, targetAccessCode);
+                    if (!accessCodeResponse.shareId) {
+                        throw new Error('访问码无效');
+                    }
+                    shareInfo.shareId = accessCodeResponse.shareId;
+                }
+
+                updates.shareId = shareInfo.shareId;
+                updates.shareFileId = shareInfo.fileId;
+                updates.shareMode = shareInfo.shareMode;
+
+                // 如果选择了根目录，使用新的fileId
+                if (shareFolderId === "root") {
+                    updates.shareFolderId = shareInfo.fileId;
+                } else {
+                    updates.shareFolderId = shareFolderId;
+                }
+
             } else {
-                updates.shareFolderId = shareFolderId;
+                // 链接未修改，或者只修改了其他属性
+                if (shareFolderId === "root") {
+                    // 使用原任务的shareFileId
+                    updates.shareFolderId = task.shareFileId;
+                } else {
+                    updates.shareFolderId = shareFolderId;
+                }
             }
 
             // console.log('准备更新的字段:', updates);
-            
+
             const updatedTask = await taskService.updateTask(taskId, updates);
             // console.log('更新后的任务:', updatedTask);
-            
+
             // 处理定时任务更新
             createOrUpdateTaskScheduler(updatedTask);
-            
+
             res.json({ success: true, data: updatedTask });
         } catch (error) {
             console.error('更新任务失败:', error);
             res.json({ success: false, error: error.message });
         }
     });
-    
+
     // 任务删除时也需要停止定时任务
     app.delete('/api/tasks/:id', async (req, res) => {
         try {
             const taskId = parseInt(req.params.id);
-            
+
             // 如果有定时任务，先停止
             if (taskSchedulers.has(taskId)) {
                 const scheduler = taskSchedulers.get(taskId);
@@ -909,7 +953,7 @@ AppDataSource.initialize().then(async () => {
                 taskSchedulers.delete(taskId);
                 console.log(`已停止并删除任务[${taskId}]的定时任务`);
             }
-            
+
             await taskService.deleteTask(taskId);
             res.json({ success: true });
         } catch (error) {
@@ -964,7 +1008,7 @@ AppDataSource.initialize().then(async () => {
         try {
             const accountId = parseInt(req.params.accountId);
             const { shareLink, accessCode } = req.body;
-            
+
             const account = await accountRepo.findOneBy({ id: accountId });
             if (!account) {
                 throw new Error('账号不存在');
@@ -973,7 +1017,7 @@ AppDataSource.initialize().then(async () => {
             const cloud189 = Cloud189Service.getInstance(account);
             const shareCode = await taskService.parseShareCode(shareLink);
             const shareInfo = await taskService.getShareInfo(cloud189, shareCode);
-            
+
             if (shareInfo.isFolder) {
                 const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, accessCode);
                 if (!result?.fileListAO?.folderList) {
@@ -1007,8 +1051,8 @@ AppDataSource.initialize().then(async () => {
             }
             if (folderId == -11) {
                 // 返回顶级目录
-                res.json({success: true, data: [{id: task.shareFileId, name: task.resourceName}]});
-                return 
+                res.json({ success: true, data: [{ id: task.shareFileId, name: task.resourceName }] });
+                return
             }
             const account = await accountRepo.findOneBy({ id: req.params.accountId });
             if (!account) {
@@ -1018,7 +1062,7 @@ AppDataSource.initialize().then(async () => {
             // 查询分享目录
             const shareDir = await cloud189.listShareDir(task.shareId, req.query.folderId, task.shareMode);
             if (!shareDir || !shareDir.fileListAO) {
-                res.json({ success: true, data: [] });    
+                res.json({ success: true, data: [] });
             }
             const folders = shareDir.fileListAO.folderList;
             folderCache.set(cacheKey, folders);
@@ -1028,8 +1072,8 @@ AppDataSource.initialize().then(async () => {
         }
     });
 
-     // 获取目录下的文件
-     app.get('/api/folder/files', async (req, res) => {
+    // 获取目录下的文件
+    app.get('/api/folder/files', async (req, res) => {
         const { accountId, folderId } = req.query;
         const account = await accountRepo.findOneBy({ id: accountId });
         if (!account) {
@@ -1040,7 +1084,7 @@ AppDataSource.initialize().then(async () => {
         res.json({ success: true, data: fileList });
     });
     app.post('/api/files/rename', async (req, res) => {
-        const {taskId, accountId, files, sourceRegex, targetRegex } = req.body;
+        const { taskId, accountId, files, sourceRegex, targetRegex } = req.body;
         if (files.length == 0) {
             throw new Error('未获取到需要修改的文件');
         }
@@ -1077,11 +1121,11 @@ AppDataSource.initialize().then(async () => {
                 'DINGTALK_ENABLED',
                 'DINGTALK_WEBHOOK',
                 'DINGTALK_SECRET',
-                
+
                 // 企业微信配置
                 'WECOM_ENABLED',
                 'WECOM_WEBHOOK',
-                
+
                 // Telegram配置
                 'TELEGRAM_ENABLED',
                 'TELEGRAM_BOT_TOKEN',
@@ -1092,15 +1136,15 @@ AppDataSource.initialize().then(async () => {
                 'PROXY_PORT',
                 'PROXY_USERNAME',
                 'PROXY_PASSWORD',
-                
+
                 // WxPusher配置
                 'WXPUSHER_ENABLED',
                 'WXPUSHER_SPT'
             ];
-            
+
             // 构建配置对象
             const config = {};
-            
+
             // 从数据库获取配置值
             for (const key of notificationConfigs) {
                 const notificationConfig = await AppDataSource.getRepository(NotificationConfig).findOneBy({ key });
@@ -1110,7 +1154,7 @@ AppDataSource.initialize().then(async () => {
                     config[key] = 'true';
                 }
             }
-            
+
             res.json({ success: true, data: config });
         } catch (error) {
             console.error('获取通知配置失败:', error);
@@ -1122,35 +1166,35 @@ AppDataSource.initialize().then(async () => {
     app.post('/api/config/notification', async (req, res) => {
         try {
             const config = req.body;
-            
+
             // 验证配置数据
             if (!config) {
                 return res.status(400).json({ success: false, error: '无效的配置数据' });
             }
-            
+
             const notificationRepo = AppDataSource.getRepository(NotificationConfig);
-            
+
             // 更新数据库中的配置
             for (const [key, value] of Object.entries(config)) {
                 const description = getConfigDescription(key);
-                
+
                 // 查找或创建配置项
                 let notificationConfig = await notificationRepo.findOneBy({ key });
                 if (!notificationConfig) {
                     notificationConfig = notificationRepo.create({ key });
                 }
-                
+
                 // 更新配置值
                 notificationConfig.value = value;
                 notificationConfig.description = description;
-                
+
                 // 保存到数据库
                 await notificationRepo.save(notificationConfig);
-                
+
                 // 同时更新环境变量以保持兼容性
                 process.env[key] = value;
             }
-            
+
             // 返回成功
             res.json({ success: true });
         } catch (error) {
@@ -1158,7 +1202,7 @@ AppDataSource.initialize().then(async () => {
             res.status(500).json({ success: false, error: error.message });
         }
     });
-    
+
     // 获取配置项的描述信息
     function getConfigDescription(key) {
         const descriptions = {
@@ -1166,11 +1210,11 @@ AppDataSource.initialize().then(async () => {
             'DINGTALK_ENABLED': '是否启用钉钉通知',
             'DINGTALK_WEBHOOK': '钉钉机器人Webhook地址',
             'DINGTALK_SECRET': '钉钉机器人安全设置Secret',
-            
+
             // 企业微信配置
             'WECOM_ENABLED': '是否启用企业微信通知',
             'WECOM_WEBHOOK': '企业微信机器人Webhook地址',
-            
+
             // Telegram配置
             'TELEGRAM_ENABLED': '是否启用Telegram通知',
             'TELEGRAM_BOT_TOKEN': 'Telegram机器人Token',
@@ -1181,12 +1225,12 @@ AppDataSource.initialize().then(async () => {
             'PROXY_PORT': '代理端口',
             'PROXY_USERNAME': '代理用户名',
             'PROXY_PASSWORD': '代理密码',
-            
+
             // WxPusher配置
             'WXPUSHER_ENABLED': '是否启用WxPusher通知',
             'WXPUSHER_SPT': 'WxPusher SPT'
         };
-        
+
         return descriptions[key] || `${key}配置`;
     }
 
@@ -1200,8 +1244,8 @@ AppDataSource.initialize().then(async () => {
                 .take(100)
                 .getMany();
 
-            res.json({ 
-                success: true, 
+            res.json({
+                success: true,
                 data: logs.map(log => ({
                     id: log.id,
                     taskId: log.taskId,
@@ -1223,7 +1267,7 @@ AppDataSource.initialize().then(async () => {
             if (!Array.isArray(configs)) {
                 return res.status(400).json({ success: false, error: '无效的配置数据格式' });
             }
-            
+
             // 标记是否需要重新设置全局定时任务
             let needResetGlobalScheduler = false;
             let needReloadTaskExpireDays = false;
@@ -1236,7 +1280,7 @@ AppDataSource.initialize().then(async () => {
 
             // 标记是否需要重新设置签到任务
             let needResetSignInTaskScheduler = false;
-            
+
             // 保存配置到数据库
             for (const config of configs) {
                 // 处理密码加密
@@ -1244,17 +1288,17 @@ AppDataSource.initialize().then(async () => {
                     // 如果包含加密信息，则需要解密
                     if (config.encryptionData) {
                         const { keyId, publicKey, timestamp } = config.encryptionData;
-                        
+
                         // 验证加密密钥是否有效
                         const keyInfo = req.session.encryptionKeys && req.session.encryptionKeys[keyId];
-                        
+
                         if (!keyInfo || keyInfo.expires < Date.now()) {
-                            return res.status(400).json({ 
-                                success: false, 
-                                error: '加密密钥无效或已过期' 
+                            return res.status(400).json({
+                                success: false,
+                                error: '加密密钥无效或已过期'
                             });
                         }
-                        
+
                         // 使用临时公钥解密
                         try {
                             const decryptedPassword = cryptoUtil.aesDecrypt(config.value, keyInfo.publicKey);
@@ -1265,14 +1309,14 @@ AppDataSource.initialize().then(async () => {
                                 continue;
                             }
                             await configService.setConfig(config.key, decryptedPassword, config.description);
-                            
+
                             // 清除已使用的加密密钥
                             delete req.session.encryptionKeys[keyId];
                         } catch (e) {
                             console.error('密码解密失败:', e);
-                            return res.status(400).json({ 
-                                success: false, 
-                                error: '密码解密失败' 
+                            return res.status(400).json({
+                                success: false,
+                                error: '密码解密失败'
                             });
                         }
                     } else {
@@ -1283,7 +1327,7 @@ AppDataSource.initialize().then(async () => {
                     // 其他配置正常保存
                     await configService.setConfig(config.key, config.value, config.description);
                 }
-                
+
                 // 检查是否修改了关键配置
                 if (config.key === 'TASK_CHECK_INTERVAL') {
                     needResetGlobalScheduler = true;
@@ -1293,44 +1337,44 @@ AppDataSource.initialize().then(async () => {
 
                 // 检查是否修改了清空回收站任务配置
                 if (config.key === 'CLEAR_RECYCLE_INTERVAL') {
-                    needResetClearRecycleScheduler = true;  
+                    needResetClearRecycleScheduler = true;
                 }
 
-                if(config.key=== 'DELETE_EXTRAFILES_INTERVAL'){
+                if (config.key === 'DELETE_EXTRAFILES_INTERVAL') {
                     needResetDeleteExtraFilesTaskScheduler = true;
                 }
 
-                if(config.key === 'SIGN_IN_INTERVAL'){
+                if (config.key === 'SIGN_IN_INTERVAL') {
                     needResetSignInTaskScheduler = true;
                 }
             }
-            
+
             // 更新缓存过期时间
             const newFolderCacheTTL = configs.find(c => c.key === 'FOLDER_CACHE_TTL')?.value;
             if (newFolderCacheTTL) {
                 folderCache.setTTL(parseInt(newFolderCacheTTL));
             }
-            
+
             // 重新初始化定时任务
             if (needResetGlobalScheduler) {
                 await setupGlobalTaskScheduler();
             }
-            
+
             // 重新加载任务过期天数
             if (needReloadTaskExpireDays) {
                 await taskService.loadConfig();
             }
 
-            if(needResetClearRecycleScheduler)  {
+            if (needResetClearRecycleScheduler) {
                 await setupClearRecycleTaskScheduler();
             }
-            
-            if (needResetDeleteExtraFilesTaskScheduler){
+
+            if (needResetDeleteExtraFilesTaskScheduler) {
                 await setupDeleteExtraFilesTaskScheduler();
             }
-            if (needResetSignInTaskScheduler){
+            if (needResetSignInTaskScheduler) {
                 await setupSignInTaskScheduler();
-             }
+            }
             res.json({ success: true });
         } catch (error) {
             console.error('更新系统设置失败:', error);
@@ -1343,7 +1387,7 @@ AppDataSource.initialize().then(async () => {
         try {
             const { currentPassword } = req.body;
             const storedPassword = await configService.getConfigValue('AUTH_PASSWORD');
-            
+
             // 验证密码是否正确
             if (currentPassword === storedPassword) {
                 res.json({ success: true });
@@ -1361,20 +1405,20 @@ AppDataSource.initialize().then(async () => {
         try {
             const results = await messageUtil.testSendMessage();
             const success = results.every(result => result === true);
-            
+
             if (success) {
                 res.json({ success: true });
             } else {
-                res.json({ 
-                    success: false, 
-                    error: '部分通知发送失败，请检查配置' 
+                res.json({
+                    success: false,
+                    error: '部分通知发送失败，请检查配置'
                 });
             }
         } catch (error) {
             console.error('测试发送通知失败:', error);
-            res.status(500).json({ 
-                success: false, 
-                error: error.message 
+            res.status(500).json({
+                success: false,
+                error: error.message
             });
         }
     });
@@ -1385,28 +1429,28 @@ AppDataSource.initialize().then(async () => {
             // 获取并发数和家庭ID列表
             const execThreshold = req.body.execThreshold || 1;
             const families = req.body.families || [];
-            
+
             console.log(`执行立即签到，并发数：${execThreshold}，家庭ID：${families.join(',')}`);
-            
+
             const accounts = await accountRepo.find();
             if (!accounts || accounts.length === 0) {
                 return res.json({ success: false, error: '未找到任何账号' });
             }
-            
+
             console.log(`找到${accounts.length}个账号进行签到任务`);
-            
+
             // 签到结果汇总
             const results = [];
-            
+
             for (const account of accounts) {
                 try {
                     const cloud189 = Cloud189Service.getInstance(account);
                     const result = await taskService.cloudSignTask(cloud189, execThreshold, families);
-                    
+
                     // 将用户名脱敏
                     const maskedUsername = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
                     results.push(`账号 ${maskedUsername} 签到成功`);
-                    
+
                     // 延迟5秒
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 } catch (error) {
@@ -1414,14 +1458,14 @@ AppDataSource.initialize().then(async () => {
                     results.push(`账号 ${account.id} 签到失败: ${error.message}`);
                 }
             }
-            
+
             // 发送通知
             if (results.length > 0) {
                 messageUtil.sendMessage(`【手动触发签到】\n${results.join('\n')}`);
             }
-            
-            return res.json({ 
-                success: true, 
+
+            return res.json({
+                success: true,
                 message: `共${accounts.length}个账号，成功：${results.filter(r => r.includes('成功')).length}，失败：${results.filter(r => r.includes('失败')).length}`,
                 details: results
             });

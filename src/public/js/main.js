@@ -79,13 +79,13 @@ async function confirmFolderSelection() {
             closeFolderSelectModal();
             document.getElementById('taskForm').reset();
             toast.success('任务创建成功');
-            
+
             // 执行新创建的任务
             const tasks = Array.isArray(data.data) ? data.data : [data.data];
             for (const task of tasks) {
                 await executeTask(task.id, false);
             }
-            
+
             fetchTasks();
         } else {
             throw new Error(data.error || '创建任务失败');
@@ -106,10 +106,10 @@ function showNotificationConfigModal() {
                 document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true' || config.DINGTALK_ENABLED === '1';
                 document.getElementById('dingTalkToken').value = config.DINGTALK_WEBHOOK || '';
                 document.getElementById('dingTalkSecret').value = config.DINGTALK_SECRET || '';
-                
+
                 document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true' || config.WECOM_ENABLED === '1';
                 document.getElementById('wecomWebhook').value = config.WECOM_WEBHOOK || '';
-                
+
                 document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true' || config.TELEGRAM_ENABLED === '1';
                 document.getElementById('telegramBotToken').value = config.TELEGRAM_BOT_TOKEN || '';
                 document.getElementById('telegramChatId').value = config.TELEGRAM_CHAT_ID || '';
@@ -119,7 +119,7 @@ function showNotificationConfigModal() {
                 document.getElementById('proxyPort').value = config.PROXY_PORT || '';
                 document.getElementById('proxyUsername').value = config.PROXY_USERNAME || '';
                 document.getElementById('proxyPassword').value = config.PROXY_PASSWORD || '';
-                
+
                 document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true' || config.WXPUSHER_ENABLED === '1';
                 document.getElementById('wxPusherSpt').value = config.WXPUSHER_SPT || '';
             }
@@ -164,16 +164,16 @@ async function loadNotificationConfig() {
         const data = await response.json();
         if (data.success) {
             const config = data.data;
-            
+
             // 钉钉配置
             document.getElementById('dingTalkEnabled').checked = config.DINGTALK_ENABLED === 'true' || config.DINGTALK_ENABLED === '1';
             document.getElementById('dingTalkToken').value = config.DINGTALK_WEBHOOK || '';
             document.getElementById('dingTalkSecret').value = config.DINGTALK_SECRET || '';
-            
+
             // 企业微信配置
             document.getElementById('wecomEnabled').checked = config.WECOM_ENABLED === 'true' || config.WECOM_ENABLED === '1';
             document.getElementById('wecomWebhook').value = config.WECOM_WEBHOOK || '';
-            
+
             // Telegram配置
             document.getElementById('telegramEnabled').checked = config.TELEGRAM_ENABLED === 'true' || config.TELEGRAM_ENABLED === '1';
             document.getElementById('telegramBotToken').value = config.TELEGRAM_BOT_TOKEN || '';
@@ -184,7 +184,7 @@ async function loadNotificationConfig() {
             document.getElementById('proxyPort').value = config.PROXY_PORT || '';
             document.getElementById('proxyUsername').value = config.PROXY_USERNAME || '';
             document.getElementById('proxyPassword').value = config.PROXY_PASSWORD || '';
-            
+
             // WxPusher配置
             document.getElementById('wxPusherEnabled').checked = config.WXPUSHER_ENABLED === 'true' || config.WXPUSHER_ENABLED === '1';
             document.getElementById('wxPusherSpt').value = config.WXPUSHER_SPT || '';
@@ -226,7 +226,7 @@ async function loadUpdateLogs() {
     try {
         const response = await fetch('/api/logs');
         const data = await response.json();
-        
+
         if (!data.success) {
             throw new Error(data.error || '获取更新记录失败');
         }
@@ -235,9 +235,9 @@ async function loadUpdateLogs() {
         if (!tbody) {
             throw new Error('找不到更新记录容器');
         }
-        
+
         tbody.innerHTML = '';
-        
+
         data.data.forEach(log => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -257,15 +257,15 @@ async function loadUpdateLogs() {
 function initNotificationConfig() {
     document.getElementById('notificationConfigForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const config = {
             DINGTALK_ENABLED: document.getElementById('dingTalkEnabled').checked ? '1' : '0',
             DINGTALK_WEBHOOK: document.getElementById('dingTalkToken').value,
             DINGTALK_SECRET: document.getElementById('dingTalkSecret').value,
-            
+
             WECOM_ENABLED: document.getElementById('wecomEnabled').checked ? '1' : '0',
             WECOM_WEBHOOK: document.getElementById('wecomWebhook').value,
-            
+
             TELEGRAM_ENABLED: document.getElementById('telegramEnabled').checked ? '1' : '0',
             TELEGRAM_BOT_TOKEN: document.getElementById('telegramBotToken').value,
             TELEGRAM_CHAT_ID: document.getElementById('telegramChatId').value,
@@ -275,11 +275,11 @@ function initNotificationConfig() {
             PROXY_PORT: document.getElementById('proxyPort').value,
             PROXY_USERNAME: document.getElementById('proxyUsername').value,
             PROXY_PASSWORD: document.getElementById('proxyPassword').value,
-            
+
             WXPUSHER_ENABLED: document.getElementById('wxPusherEnabled').checked ? '1' : '0',
             WXPUSHER_SPT: document.getElementById('wxPusherSpt').value
         };
-        
+
         try {
             const response = await fetch('/api/config/notification', {
                 method: 'POST',
@@ -400,7 +400,8 @@ async function handleEditTaskSubmit(e) {
         shareFolderName: document.getElementById('shareFolder').value || null,
         shareLink: document.getElementById('editShareLink').value || null,
         accessCode: document.getElementById('editAccessCode').value || null,
-        status: document.getElementById('editStatus').value
+        status: document.getElementById('editStatus').value,
+        accountId: document.getElementById('editAccountId').value
     };
 
     console.log('提交的表单数据:', formData);
@@ -459,7 +460,7 @@ async function loadTasks() {
                     ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}', 
                     '${task.shareLink}', '${task.accessCode}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
                     '${task.targetFolderName || ''}', ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex}, '${task.maxKeepSaveFile}','${task.whitelistKeywords || ''}', 
-                    '${task.blacklistKeywords || ''}','${task.cronExpression || ''}')" class="btn btn-secondary mr-2">
+                    '${task.blacklistKeywords || ''}','${task.cronExpression || ''}', ${task.accountId})" class="btn btn-secondary mr-2">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button onclick="showUpdateLogs(${task.id})" class="btn btn-secondary mr-2">
@@ -478,8 +479,30 @@ async function loadTasks() {
 }
 
 // 显示编辑任务模态框
-async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, 
-                                episodeRegex,episodeUseRegex,maxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression) {
+async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold,
+    episodeRegex, episodeUseRegex, maxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression, accountId) {
+
+    // 加载账号列表
+    try {
+        const response = await fetch('/api/accounts');
+        const data = await response.json();
+        if (data.success) {
+            const select = document.getElementById('editAccountId');
+            select.innerHTML = '';
+            data.data.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = account.username;
+                if (account.id == accountId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('加载账号列表失败:', error);
+    }
+
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
@@ -498,7 +521,7 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('editTargetFolder').value = targetFolderName || '';
     document.getElementById('editTargetFolderId').value = targetFolderId || '';
     document.getElementById('editCurrentEpisodes').value = currentEpisodes || 0;
-    
+
     document.getElementById('editTaskModal').style.display = 'block';
 }
 
@@ -507,7 +530,7 @@ async function showUpdateLogs(taskId) {
     try {
         const response = await fetch(`/api/logs/${taskId}`);
         const data = await response.json();
-        
+
         if (!data.success) {
             throw new Error(data.error || '获取更新记录失败');
         }
@@ -516,9 +539,9 @@ async function showUpdateLogs(taskId) {
         if (!tbody) {
             throw new Error('找不到更新记录容器');
         }
-        
+
         tbody.innerHTML = '';
-        
+
         data.data.forEach(log => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -597,7 +620,7 @@ async function handleFolderSelection(shareLink, accessCode) {
         if (!tbody) {
             throw new Error('找不到目录列表容器');
         }
-        
+
         tbody.innerHTML = `
             <tr>
                 <td><input type="checkbox" class="folder-checkbox" data-id="root" data-name="根目录"></td>
@@ -637,7 +660,7 @@ async function handleFolderSelection(shareLink, accessCode) {
 }
 
 // 移除分享链接输入的自动触发
-document.getElementById('shareLink').addEventListener('input', async function() {
+document.getElementById('shareLink').addEventListener('input', async function () {
     const shareLink = this.value;
     if (shareLink) {
         document.getElementById('folderSelection').classList.remove('hidden');
@@ -678,7 +701,7 @@ function initEditTaskForm() {
         shareFolder.addEventListener('click', async (e) => {
             e.preventDefault();
             const taskId = document.getElementById('editTaskId').value;
-            const accountId = document.getElementById('accountId').value;
+            const accountId = document.getElementById('editAccountId').value;
             const shareLink = document.getElementById('editShareLink').value;
             const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
@@ -702,7 +725,7 @@ function initEditTaskForm() {
         treeSelect.addEventListener('click', async (e) => {
             e.preventDefault();
             const taskId = document.getElementById('editTaskId').value;
-            const accountId = document.getElementById('accountId').value;
+            const accountId = document.getElementById('editAccountId').value;
             const shareLink = document.getElementById('editShareLink').value;
             const accessCode = document.getElementById('editAccessCode').value;
             if (!accountId) {
@@ -726,7 +749,7 @@ function initEditTaskForm() {
     if (editTargetFolder) {
         editTargetFolder.addEventListener('click', (e) => {
             e.preventDefault();
-            const accountId = document.getElementById('accountId').value;
+            const accountId = document.getElementById('editAccountId').value;
             if (!accountId) {
                 toast.error('请先选择账号');
                 return;
@@ -742,17 +765,19 @@ function initEditTaskForm() {
             // 清空已选择的源目录
             document.getElementById('shareFolder').value = '';
             document.getElementById('shareFolderId').value = '';
-            document.getElementById('shareFolderAccessCode').value = '';
+            // document.getElementById('shareFolderAccessCode').value = '';
         });
     }
 }
+
+
 
 // 分享目录选择器类
 class ShareFolderSelector {
     constructor({ onSelect }) {
         this.onSelect = onSelect;
         this.selectedFolder = null;
-        
+
         // 创建模态框
         const modal = document.createElement('div');
         modal.id = 'shareFolderSelectorModal';
@@ -788,13 +813,13 @@ class ShareFolderSelector {
                 </div>
             </div>
         `;
-        
+
         // 如果已存在则移除
         const existingModal = document.getElementById('shareFolderSelectorModal');
         if (existingModal) {
             existingModal.remove();
         }
-        
+
         // 添加到 body
         document.body.appendChild(modal);
 
@@ -813,7 +838,7 @@ class ShareFolderSelector {
     async show(taskId, accountId, shareLink, accessCode) {
         try {
             // const accessCode = document.getElementById('shareFolderAccessCode')?.value || '';
-            
+
             if (!shareLink) {
                 throw new Error('分享链接不存在');
             }
@@ -833,7 +858,7 @@ class ShareFolderSelector {
             if (!tbody) {
                 throw new Error('找不到目录列表容器');
             }
-            
+
             tbody.innerHTML = '';
 
             // 添加根目录选项
