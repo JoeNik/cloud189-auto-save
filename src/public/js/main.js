@@ -383,14 +383,18 @@ async function handleTaskSubmit(e) {
 async function handleEditTaskSubmit(e) {
     e.preventDefault();
     const taskId = document.getElementById('editTaskId').value;
+    const epThresholdVal = document.getElementById('editEpisodeThreshold').value;
+    const maxKeepVal = document.getElementById('editMaxKeepSaveFile').value;
+    const curEpVal = document.getElementById('editCurrentEpisodes').value;
+
     const formData = {
         resourceName: document.getElementById('editResourceName').value,
         totalEpisodes: document.getElementById('editTotalEpisodes').value || null,
-        currentEpisodes: document.getElementById('editCurrentEpisodes').value || null,
-        episodeThreshold: document.getElementById('editEpisodeThreshold').value || 1000,
+        currentEpisodes: curEpVal === '' ? null : parseInt(curEpVal),
+        episodeThreshold: epThresholdVal === '' ? 1000 : parseInt(epThresholdVal),
         episodeRegex: document.getElementById('editEpisodeRegex').value || null,
         episodeUseRegex: document.getElementById('editEpisodeUseRegex').checked ? 1 : 0,
-        maxKeepSaveFile: document.getElementById('editMaxKeepSaveFile').value || 100,
+        maxKeepSaveFile: maxKeepVal === '' ? 100 : parseInt(maxKeepVal),
         whitelistKeywords: document.getElementById('editWhitelistKeywords').value || null,
         blacklistKeywords: document.getElementById('editBlacklistKeywords').value || null,
         cronExpression: document.getElementById('editCronExpression').value || null,
@@ -506,10 +510,10 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('editTaskId').value = taskId;
     document.getElementById('editResourceName').value = resourceName;
     document.getElementById('editTotalEpisodes').value = totalEpisodes || '';
-    document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
+    document.getElementById('editEpisodeThreshold').value = (episodeThreshold !== undefined && episodeThreshold !== null) ? episodeThreshold : 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
     document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex === 1;
-    document.getElementById('editMaxKeepSaveFile').value = maxKeepSaveFile || 100;
+    document.getElementById('editMaxKeepSaveFile').value = (maxKeepSaveFile !== undefined && maxKeepSaveFile !== null) ? maxKeepSaveFile : 100;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editCronExpression').value = cronExpression || '';
@@ -520,7 +524,7 @@ async function showEditTaskModal(taskId, targetFolderId, currentEpisodes, totalE
     document.getElementById('editAccessCode').value = accessCode || '';
     document.getElementById('editTargetFolder').value = targetFolderName || '';
     document.getElementById('editTargetFolderId').value = targetFolderId || '';
-    document.getElementById('editCurrentEpisodes').value = currentEpisodes || 0;
+    document.getElementById('editCurrentEpisodes').value = (currentEpisodes !== undefined && currentEpisodes !== null) ? currentEpisodes : 0;
 
     document.getElementById('editTaskModal').style.display = 'block';
 }

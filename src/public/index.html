@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,23 +21,24 @@
     <script>
         // 简单的加密函数
         function encryptPassword(password, publicKey, timestamp) {
-            
+
             // 确保使用16字节的IV，与后端一致
             const ivHex = '0123456789abcdef0123456789abcdef';
             const iv = CryptoJS.enc.Hex.parse(ivHex);
             const key = CryptoJS.SHA256(publicKey);
-            
+
             const encrypted = CryptoJS.AES.encrypt(password, key, {
                 iv: iv,
                 mode: CryptoJS.mode.CBC,
                 padding: CryptoJS.pad.Pkcs7
             });
-            
+
             const result = encrypted.toString();
             return result;
         }
     </script>
 </head>
+
 <body>
     <div class="container">
         <h1>天翼云盘自动转存系统</h1>
@@ -64,7 +66,7 @@
                     <input type="text" id="cookies">
                 </div>
                 <div class="form-group">
-                <small class="form-text">密码和Cookies至少填写一个, 如果都填写, 则只有账号密码生效</small>
+                    <small class="form-text">密码和Cookies至少填写一个, 如果都填写, 则只有账号密码生效</small>
                 </div>
                 <button type="submit">添加账号</button>
             </form>
@@ -113,7 +115,8 @@
             <div style="position: relative;">
                 <button class="view-toggle" onclick="toggleView()" title="切换视图">
                     <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                        <path
+                            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                     </svg>
                 </button>
                 <div class="table-container">
@@ -301,11 +304,12 @@
                         <label for="authPassword">管理员密码</label>
                         <input type="password" id="authPassword" name="AUTH_PASSWORD" placeholder="留空则不修改密码">
                     </div>
-                    
+
                     <h3>定时任务设置</h3>
                     <div class="form-group">
                         <label for="taskCheckInterval">全局定时任务表达式</label>
-                        <input type="text" id="taskCheckInterval" name="TASK_CHECK_INTERVAL" placeholder="Cron表达式，例如：0 */30 * * * *">
+                        <input type="text" id="taskCheckInterval" name="TASK_CHECK_INTERVAL"
+                            placeholder="Cron表达式，例如：0 */30 * * * *">
                         <small>默认为每30分钟执行一次：0 */30 * * * *</small>
                     </div>
                     <div class="form-group">
@@ -313,7 +317,7 @@
                         <input type="number" id="taskExpireDays" name="TASK_EXPIRE_DAYS" placeholder="任务过期天数">
                         <small>超过指定天数未更新的任务将被视为过期</small>
                     </div>
-                    
+
                     <h3>缓存设置</h3>
                     <div class="form-group">
                         <label for="folderCacheTTL">文件目录缓存时间（秒）</label>
@@ -323,7 +327,8 @@
 
                     <div class="form-group">
                         <label for="clearRecycleInterval">清空回收站定时任务表达式</label>
-                        <input type="text" id="clearRecycleInterval" name="CLEAR_RECYCLE_INTERVAL" placeholder="Cron表达式，例如：0 2 * * * *">
+                        <input type="text" id="clearRecycleInterval" name="CLEAR_RECYCLE_INTERVAL"
+                            placeholder="Cron表达式，例如：0 2 * * * *">
                         <small>默认：0 2 * * * *</small>
                     </div>
 
@@ -346,7 +351,8 @@
 
                     <div class="form-group">
                         <label for="deleteExtraFilesInterval">删除指定文件夹下多余文件定时任务表达式</label>
-                        <input type="text" id="deleteExtraFilesInterval" name="DELETE_EXTRAFILES_INTERVAL" placeholder="Cron表达式，例如：0 23 * * * *">
+                        <input type="text" id="deleteExtraFilesInterval" name="DELETE_EXTRAFILES_INTERVAL"
+                            placeholder="Cron表达式，例如：0 23 * * * *">
                         <small>默认：0 23 * * * *</small>
                     </div>
 
@@ -360,30 +366,32 @@
                             <label class="custom-control-label" for="Enable_Sign_In_Task">开关</label>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="signInInterval">签到定时表达式</label>
-                        <input type="text" id="signInInterval" name="SIGN_IN_INTERVAL" placeholder="Cron表达式，例如：0 0 8 * * *">
+                        <input type="text" id="signInInterval" name="SIGN_IN_INTERVAL"
+                            placeholder="Cron表达式，例如：0 0 8 * * *">
                         <small>默认：每天早上8点执行一次（0 0 8 * * *）</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="signInExecThreshold">签到并发数</label>
-                        <input type="number" id="signInExecThreshold" name="SIGN_IN_EXEC_THRESHOLD" placeholder="并发执行数量" value="1" min="1">
+                        <input type="number" id="signInExecThreshold" name="SIGN_IN_EXEC_THRESHOLD" placeholder="并发执行数量"
+                            value="1" min="1">
                         <small>同时执行签到的账号数量，默认为1</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="signInFamilies">家庭ID</label>
                         <input type="text" id="signInFamilies" name="SIGN_IN_FAMILIES" placeholder="多个家庭ID用英文逗号分隔">
                         <small>要签到的家庭ID，多个ID之间用英文逗号分隔</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <button type="button" id="signInNow" class="btn-primary">立即签到</button>
                         <small id="signInStatus"></small>
                     </div>
-                    
+
                     <div class="form-actions">
                         <button type="submit">保存配置</button>
                         <button type="reset">重置</button>
@@ -393,72 +401,35 @@
         </div>
     </div>
 
-<!-- 在 body 结束标签前添加以下脚本引用 -->
-<script src="/js/folderSelector.js"></script>
-<script src="/js/tabs.js"></script>
-<script src="/js/accounts.js"></script>
-<script src="/js/tasks.js"></script>
-<script src="/js/view-toggle.js"></script>
-<script src="/js/edit-task.js"></script>
-<script src="/js/main.js"></script>
-<script src="/js/toast.js"></script>
-<script src="/js/folder-tree.js"></script>
-<script src="/js/notification.js"></script>
-<script src="/js/system.js"></script>
-<script src="/js/buttonMod.js"></script>
+    <!-- 在 body 结束标签前添加以下脚本引用 -->
+    <script src="/js/folderSelector.js"></script>
+    <script src="/js/tabs.js"></script>
+    <script src="/js/accounts.js"></script>
+    <script src="/js/tasks.js"></script>
+    <script src="/js/view-toggle.js"></script>
+    <script src="/js/edit-task.js"></script>
+    <script src="/js/main.js"></script>
+    <script src="/js/toast.js"></script>
+    <script src="/js/folder-tree.js"></script>
+    <script src="/js/notification.js"></script>
+    <script src="/js/system.js"></script>
+    <script src="/js/buttonMod.js"></script>
 
-<script>
-// 源目录选择器
-const shareFolderSelector = new FolderSelector({
-    onSelect: ({ id, name }) => {
-        document.getElementById('shareFolder').value = name;
-        document.getElementById('shareFolderId').value = id;
-    }
-});
+    <script>
 
-// 更新目录选择器
-const targetFolderSelector = new FolderSelector({
-    onSelect: ({ id, name }) => {
-        document.getElementById('editTargetFolder').value = name;
-        document.getElementById('editTargetFolderId').value = id;
-    }
-});
 
-// 源目录选择触发
-const shareFolder = document.getElementById('shareFolder');
-shareFolder.addEventListener('click', (e) => {
-    e.preventDefault();
-    const accountId = document.getElementById('accountId').value;
-    if (!accountId) {
-        alert('请先选择账号');
-        return;
-    }
-    shareFolderSelector.show(accountId);
-});
-
-// 更新目录选择触发
-const editTargetFolder = document.getElementById('editTargetFolder');
-editTargetFolder.addEventListener('click', (e) => {
-    e.preventDefault();
-    const accountId = document.getElementById('accountId').value;
-    if (!accountId) {
-        alert('请先选择账号');
-        return;
-    }
-    targetFolderSelector.show(accountId);
-});
-
-// 直接调用初始化函数，确保在页面加载后执行
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('页面加载完成，开始初始化应用...');
-    // 检查登录状态
-    checkLogin();
-    // 初始化应用
-    initializeApp();
-});
-</script>
+        // 直接调用初始化函数，确保在页面加载后执行
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('页面加载完成，开始初始化应用...');
+            // 检查登录状态
+            checkLogin();
+            // 初始化应用
+            initializeApp();
+        });
+    </script>
 
 </body>
+
 </html>
 
 <!-- 修改任务弹窗 -->
@@ -484,12 +455,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="text" id="editShareLink" required>
                     </div>
                 </div>
-               <div>
-                <label for="shareFolderId">访问码</label>
+                <div>
+                    <label for="shareFolderId">访问码</label>
                     <div class="tree-select">
                         <input type="text" id="editAccessCode" placeholder="访问码（可选）">
                     </div>
-               </div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="shareFolderId">源目录(分享链接中的目录)</label>
@@ -522,7 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div>
                 <label for="editEpisodeUseRegex">使用正则提取集数</label>
                 <div class="custom-control custom-switch">
-                    <input type="checkbox" class="custom-control-input" id="editEpisodeUseRegex" 
+                    <input type="checkbox" class="custom-control-input" id="editEpisodeUseRegex"
                         name="editEpisodeUseRegex">
                     <label class="custom-control-label" for="editEpisodeUseRegex">开关</label>
                 </div>

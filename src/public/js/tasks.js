@@ -55,9 +55,9 @@ async function fetchTasks() {
                         <button class="btn-warning" onclick="deleteTask(${task.id})">删除</button>
                         <button onclick="executeTask(${task.id})">执行</button>
                         <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
-                         ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, 
+                         ${task.currentEpisodes !== undefined ? task.currentEpisodes : 0}, ${task.totalEpisodes || 0}, 
                          '${task.status}','${task.shareLink}', '${task.accessCode}', '${task.shareFolderId}','${task.shareFolderName}', '${task.resourceName}', '${task.targetFolderName}', 
-                         ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex},'${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}', ${task.accountId})">修改</button>
+                         ${task.episodeThreshold !== undefined ? task.episodeThreshold : 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex},'${task.maxKeepSaveFile}', '${task.whitelistKeywords || ''}', '${task.blacklistKeywords || ''}', '${task.cronExpression || ''}', ${task.accountId})">修改</button>
                     </td>
                     <td data-label="资源名称"><a href="${task.shareLink}" target="_blank" class='ellipsis' title="${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}">${task.shareFolderName ? (task.resourceName + '/' + task.shareFolderName) : task.resourceName || '未知'}</a></td>
                     <td data-label="账号ID">${task.accountId}</td>
