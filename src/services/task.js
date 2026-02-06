@@ -14,7 +14,7 @@ class TaskService {
 
         // 从配置服务加载过期天数
         this.loadConfig();
-        
+
         // 默认的集数匹配正则表达式
         this.defaultEpisodeRegex = [
             /[Ss]\d+[Ee](\d+)/,    // S01E01 格式，只提取E后面的集数
@@ -35,7 +35,7 @@ class TaskService {
     }
 
     // 从文件名中提取集数
-    _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex,existingFilesNames = []) {
+    _getEpisodeNumber(fileName, episodeRegex, episodeUseRegex, existingFilesNames = []) {
         console.log(`开始解析 ${fileName} 的集数,正则: ${episodeRegex},是否使用正则: ${episodeUseRegex}`);
 
         // 如果不使用正则表达式
@@ -86,7 +86,7 @@ class TaskService {
         if (task.whitelistKeywords) {
             const whitelistKeywords = task.whitelistKeywords.split(',').map(k => k.trim());
             if (whitelistKeywords.length > 0) {
-                const matchesWhitelist = whitelistKeywords.some(keyword => 
+                const matchesWhitelist = whitelistKeywords.some(keyword =>
                     fileName.toLowerCase().includes(keyword.toLowerCase())
                 );
                 if (!matchesWhitelist) {
@@ -100,7 +100,7 @@ class TaskService {
         if (task.blacklistKeywords) {
             const blacklistKeywords = task.blacklistKeywords.split(',').map(k => k.trim());
             if (blacklistKeywords.length > 0) {
-                const matchesBlacklist = blacklistKeywords.some(keyword => 
+                const matchesBlacklist = blacklistKeywords.some(keyword =>
                     fileName.toLowerCase().includes(keyword.toLowerCase())
                 );
                 if (matchesBlacklist) {
@@ -114,15 +114,10 @@ class TaskService {
     }
 
     // 检查文件是否需要转存
-    _shouldSaveFile(fileName, task,existingFilesNames = []) {
+    _shouldSaveFile(fileName, task, existingFilesNames = []) {
         // 首先检查黑白名单
         if (!this._checkFileNameFilters(fileName, task)) {
             return false;
-        }
-
-        if (!task.episodeThreshold) {
-            console.log(`[${task.resourceName}] 文件 ${fileName} 无截止集数配置，默认保存`);
-            return true;
         }
 
         const episodeNumber = this._getEpisodeNumber(fileName, task.episodeRegex, task.episodeUseRegex);
@@ -130,10 +125,18 @@ class TaskService {
             console.log(`[${task.resourceName}] 文件 ${fileName} 无法解析集数，默认保存`);
             return true;
         }
-        if(episodeNumber > task.episodeThreshold) {
-            console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，截止集数为 ${task.episodeThreshold}，${episodeNumber > task.episodeThreshold ? '需要' : '不需要'}保存`);
+
+        // 【核心触发逻辑】如果截止集数为0，表示用户手动触发了“开始更新”信号，则所有解析到集数的文件都应保存
+        if (task.episodeThreshold === 0) {
+            console.log(`[${task.resourceName}] 截止集数为0(触发信号)，保存解析到的第 ${episodeNumber} 集`);
+            return true;
         }
-        return episodeNumber > task.episodeThreshold;
+
+        if (episodeNumber > task.episodeThreshold) {
+            console.log(`[${task.resourceName}] 文件 ${fileName} 解析到第 ${episodeNumber} 集，大于截止集数 ${task.episodeThreshold}，需要保存`);
+            return true;
+        }
+        return false;
     }
 
     // 解析分享码
@@ -145,25 +148,25 @@ class TaskService {
             shareCode = shareUrl.searchParams.get('code');
         } else if (shareUrl.pathname.startsWith('/t/')) {
             shareCode = shareUrl.pathname.split('/').pop();
-        }else if (shareUrl.hash && shareUrl.hash.includes('/t/')) {
+        } else if (shareUrl.hash && shareUrl.hash.includes('/t/')) {
             shareCode = shareUrl.hash.split('/').pop();
-        }else if (shareUrl.pathname.includes('share.html')) {
+        } else if (shareUrl.pathname.includes('share.html')) {
             // 其他可能的 share.html 格式
             const hashParts = shareUrl.hash.split('/');
             shareCode = hashParts[hashParts.length - 1];
         }
-        
+
         if (!shareCode) throw new Error('无效的分享链接');
         return shareCode
     }
 
     // 解析分享链接
     async getShareInfo(cloud189, shareCode) {
-         console.log("解析分享链接")
-         const shareInfo = await cloud189.getShareInfo(shareCode);
+        console.log("解析分享链接")
+        const shareInfo = await cloud189.getShareInfo(shareCode);
         //  console.log(shareInfo)
-         if (!shareInfo) throw new Error('获取分享信息失败');
-         return shareInfo;
+        if (!shareInfo) throw new Error('获取分享信息失败');
+        return shareInfo;
     }
 
     // 创建任务的基础配置
@@ -187,14 +190,14 @@ class TaskService {
         };
     }
 
-     // 验证并创建目标目录
-     async _validateAndCreateTargetFolder(cloud189, targetFolderId, shareInfo) {
+    // 验证并创建目标目录
+    async _validateAndCreateTargetFolder(cloud189, targetFolderId, shareInfo) {
         const folderInfo = await cloud189.listFiles(targetFolderId);
-        if (folderInfo.fileListAO.folderList.length > 0 && 
+        if (folderInfo.fileListAO.folderList.length > 0 &&
             folderInfo.fileListAO.folderList.find(folder => folder.name === shareInfo.fileName)) {
             throw new Error('目标已存在同名目录，请选择其他目录');
         }
-        
+
         const targetFolder = await cloud189.createFolder(shareInfo.fileName, targetFolderId);
         if (!targetFolder || !targetFolder.id) throw new Error('创建目录失败');
         return targetFolder;
@@ -202,7 +205,7 @@ class TaskService {
 
     // 处理文件夹分享
     async _handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks, selectedFolders = []) {
-        
+
         const result = await cloud189.listShareDir(shareInfo.shareId, shareInfo.fileId, shareInfo.shareMode, shareInfo.userAccessCode);
         if (!result?.fileListAO) return;
 
@@ -211,7 +214,7 @@ class TaskService {
         }
 
         const { fileList: rootFiles = [], folderList: subFolders = [] } = result.fileListAO;
-        
+
         // 处理根目录文件
         if (rootFiles.length > 0 && (selectedFolders.length === 0 || selectedFolders.includes('root'))) {
             const rootTask = this.taskRepo.create(
@@ -229,7 +232,7 @@ class TaskService {
             if (selectedFolders.length > 0 && !selectedFolders.includes(folder.id)) {
                 continue;
             }
-            
+
             const targetFolder = await cloud189.createFolder(folder.name, rootFolder.id);
             if (!targetFolder?.id) throw new Error('创建目录失败');
 
@@ -269,12 +272,12 @@ class TaskService {
         // 获取分享信息
         const account = await this.accountRepo.findOneBy({ id: accountId });
         if (!account) throw new Error('账号不存在');
-        
+
         const cloud189 = Cloud189Service.getInstance(account);
         const shareCode = await this.parseShareCode(shareLink);
         const shareInfo = await this.getShareInfo(cloud189, shareCode);
         // 如果分享链接是加密链接, 且没有提供访问码, 则抛出错误
-        if (shareInfo.shareMode == 1 ) {
+        if (shareInfo.shareMode == 1) {
             if (!accessCode) {
                 throw new Error('分享链接为加密链接, 请提供访问码');
             }
@@ -297,8 +300,8 @@ class TaskService {
             await this._handleFolderShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks, selectedFolders);
         }
 
-         // 处理单文件或空文件夹情况
-         if (tasks.length === 0) {
+        // 处理单文件或空文件夹情况
+        if (tasks.length === 0) {
             await this._handleSingleShare(cloud189, shareInfo, accountId, shareLink, targetFolderId, totalEpisodes, rootFolder, tasks);
         }
         return tasks;
@@ -359,14 +362,14 @@ class TaskService {
             // console.log(`[${task.resourceName}] 账号信息:`, account);
             const cloud189 = Cloud189Service.getInstance(account);
             // 获取分享文件列表并进行增量转存
-            const shareDir = await cloud189.listShareDir(task.shareId, task.shareFolderId, task.shareMode,task.accessCode);
+            const shareDir = await cloud189.listShareDir(task.shareId, task.shareFolderId, task.shareMode, task.accessCode);
             if (!shareDir || !shareDir.fileListAO.fileList) {
                 console.log("获取文件列表失败: " + JSON.stringify(shareDir))
                 throw new Error('获取文件列表失败');
             }
             let shareFiles = [...shareDir.fileListAO.fileList];
             let existingFiles = new Set();
-            
+
             const folderFiles = await this.getAllFolderFiles(cloud189, task.targetFolderId);
             existingFiles = new Set(
                 folderFiles
@@ -386,7 +389,7 @@ class TaskService {
                 const resourceName = task.shareFolderName ? `${task.resourceName}/${task.shareFolderName}` : task.resourceName;
                 const taskInfoList = [];
                 const fileDetailsList = [];
-                let maxEpisode = task.episodeThreshold || 1000;
+                let maxEpisode = (task.episodeThreshold !== undefined && task.episodeThreshold !== null) ? task.episodeThreshold : 1000;
                 let totalSize = 0;
 
                 // 构建任务信息列表
@@ -396,14 +399,14 @@ class TaskService {
                         fileName: file.name,
                         isFolder: 0
                     });
-                    
+
                     // 记录文件详情,包含大小信息
                     fileDetailsList.push(`📄 ${file.name} (${this._formatFileSize(file.size)})`);
                     totalSize += file.size;
 
                     // 更新最大集数
-                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex,task.episodeUseRegex);
-                    if (episodeNumber!= null && episodeNumber && episodeNumber > maxEpisode) {
+                    const episodeNumber = this._getEpisodeNumber(file.name, task.episodeRegex, task.episodeUseRegex);
+                    if (episodeNumber != null && episodeNumber && episodeNumber > maxEpisode) {
                         maxEpisode = episodeNumber;
                     }
                 }
@@ -429,23 +432,47 @@ class TaskService {
                 notificationMessage += `\n${fileDetailsList.join('\n')}`;
 
                 // 更新截止集数
-                if (maxEpisode > task.episodeThreshold) {
+                // 更新截止集数：如果当前是0（触发信号），或者发现了更大的集数
+                if (task.episodeThreshold === 0 || maxEpisode > task.episodeThreshold) {
                     const oldThreshold = task.episodeThreshold;
                     task.episodeThreshold = maxEpisode;
-                    console.log(`[${task.resourceName}] 更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`);
-                    notificationMessage += `\n\n🔄 更新截止集数：${oldThreshold || '无'} -> ${maxEpisode}`;
+                    console.log(`[${task.resourceName}] 截止集数已更新：${(oldThreshold !== undefined && oldThreshold !== null) ? oldThreshold : '无'} -> ${maxEpisode}`);
+                    notificationMessage += `\n\n🔄 截止集数已回写更新：${(oldThreshold !== undefined && oldThreshold !== null) ? oldThreshold : '无'} -> ${maxEpisode}`;
                 }
 
                 saveResults.push(notificationMessage);
                 task.status = 'processing';
                 task.lastFileUpdateTime = new Date();
                 task.currentEpisodes += 1;
+                task.failCount = 0; // 重置失败次数
                 await this.taskRepo.save(task);
+            } else {
+                // 如果没有新文件，但也执行成功了，建议也重置失败次数（视情况而定，通常只要没抛异常就算成功）
+                if (task.failCount > 0) {
+                    task.failCount = 0;
+                    await this.taskRepo.save(task);
+                }
             }
             return saveResults.length > 0 ? saveResults.join('\n\n') : null;
         } catch (error) {
             console.error('处理任务失败:', error);
-            task.status = 'failed';
+            task.failCount = (task.failCount || 0) + 1;
+
+            if (task.failCount >= 3) {
+                const oldStatus = task.status;
+                task.status = 'failed';
+
+                // 只有当状态从非失败转为失败时才发送通知，避免重复发送
+                if (oldStatus !== 'failed') {
+                    const failMessage = `❌ 任务失败通知\n任务名称: ${task.resourceName}\n连续失败次数: ${task.failCount}\n最后错误: ${error.message}`;
+                    try {
+                        this.messageUtil.sendMessage(failMessage);
+                    } catch (sendError) {
+                        console.error('发送失败通知时出错:', sendError);
+                    }
+                }
+            }
+
             await this.taskRepo.save(task);
             throw error;
         }
@@ -485,13 +512,17 @@ class TaskService {
 
         // 更新特定字段
         const allowedFields = [
-            'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes', 
-            'status', 'shareFolderName', 'shareFolderId', 'targetFolderName', 
-            'episodeThreshold', 'episodeRegex','episodeUseRegex','maxKeepSaveFile', 'whitelistKeywords', 'blacklistKeywords',
+            'resourceName', 'targetFolderId', 'currentEpisodes', 'totalEpisodes',
+            'status', 'shareFolderName', 'shareFolderId', 'targetFolderName',
+            'episodeThreshold', 'episodeRegex', 'episodeUseRegex', 'maxKeepSaveFile', 'whitelistKeywords', 'blacklistKeywords',
             'cronExpression', 'shareLink', 'accessCode', 'accountId', 'shareId', 'shareFileId', 'shareMode'
         ];
         for (const field of allowedFields) {
             if (updates[field] !== undefined) {
+                // 如果状态被从失败改为其他状态，重集失败次数
+                if (field === 'status' && updates[field] !== 'failed' && task.status === 'failed') {
+                    task.failCount = 0;
+                }
                 task[field] = updates[field];
             }
         }
@@ -521,7 +552,7 @@ class TaskService {
             throw new Error('截止集数不能为负数');
         }
 
-        if(task.maxKeepSaveFile!== null && task.maxKeepSaveFile < 0) {
+        if (task.maxKeepSaveFile !== null && task.maxKeepSaveFile < 0) {
             throw new Error('最大保存文件数不能为负数');
         }
 
@@ -540,7 +571,7 @@ class TaskService {
     async autoRename(cloud189, task) {
         if (!task.sourceRegex || !task.targetRegex) return;
         const folderInfo = await cloud189.listFiles(task.targetFolderId);
-        if (!folderInfo ||!folderInfo.fileListAO) return;
+        if (!folderInfo || !folderInfo.fileListAO) return;
         const files = folderInfo.fileListAO.fileList;
         const message = []
         for (const file of files) {
@@ -551,7 +582,7 @@ class TaskService {
             if (renameResult.res_code != 0) {
                 console.log(`${file.name}重命名为${destFileName}失败, 原因:${destFileName}${renameResult.res_msg}`)
                 message.push(` > <font color="comment">${file.name} => ${destFileName}失败, 原因:${destFileName}${renameResult.res_msg}</font>`)
-            }else{
+            } else {
                 console.log(`${file.name}重命名为${destFileName}成功`)
                 message.push(` > <font color="info">${file.name} => ${destFileName}成功</font>`)
             }
@@ -563,7 +594,7 @@ class TaskService {
     // 检查任务状态
     async checkTaskStatus(cloud189, taskId, count = 0, type) {
         if (count > 5) {
-             return false;
+            return false;
         }
         // 轮询任务状态
         const task = await cloud189.checkTaskStatus(taskId)
@@ -592,8 +623,8 @@ class TaskService {
         return false;
     }
 
-     // 创建批量任务
-     async createBatchTask(cloud189, batchTaskDto) {
+    // 创建批量任务
+    async createBatchTask(cloud189, batchTaskDto) {
         console.log(`[批量任务] 开始创建任务, 参数: ${JSON.stringify(batchTaskDto)}`)
         const resp = await cloud189.createBatchTask(batchTaskDto);
         if (!resp) {
@@ -606,7 +637,7 @@ class TaskService {
             throw new Error('批量任务处理失败: 任务ID为空');
         }
         console.log(`[批量任务] 任务创建成功, 任务ID: ${resp.taskId}, 类型: ${batchTaskDto.type}`)
-        
+
         // 确保this上下文正确
         try {
             const success = await this.checkTaskStatus.bind(this)(cloud189, resp.taskId, 0, batchTaskDto.type);
@@ -620,15 +651,15 @@ class TaskService {
         }
     }
 
-     // 定时清空回收站
-     async clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle) {
+    // 定时清空回收站
+    async clearRecycleBin(enableAutoClearRecycle, enableAutoClearFamilyRecycle) {
         console.log(`定时清空回收站任务开始执行`)
         const accounts = await this.accountRepo.find()
         if (accounts) {
             for (const account of accounts) {
                 let username = account.username.replace(/(.{3}).*(.{4})/, '$1****$2');
                 try {
-                    const cloud189 = Cloud189Service.getInstance(account); 
+                    const cloud189 = Cloud189Service.getInstance(account);
                     // 确保this上下文正确
                     await this._clearRecycleBin.bind(this)(cloud189, username, enableAutoClearRecycle, enableAutoClearFamilyRecycle)
                     // 记录成功日志
@@ -648,7 +679,7 @@ class TaskService {
         const params = {
             taskInfos: '[]',
             type: 'EMPTY_RECYCLE',
-        }   
+        }
         const batchTaskDto = new BatchTaskDto(params);
         if (enableAutoClearRecycle) {
             console.log(`开始清空[${username}]个人回收站`)
@@ -677,10 +708,10 @@ class TaskService {
 
     // 删除任务下的文件夹目录多余的文件
     async processDeleteExtraFilesTask(cloud189, task) {
-        try{
+        try {
             // console.log('---------------',task)
             const folderInfo = await this.getAllFolderFiles(cloud189, task.targetFolderId);
-            const files = folderInfo.filter(file =>!file.isFolder);
+            const files = folderInfo.filter(file => !file.isFolder);
             if (files.length > task.maxKeepSaveFile) {
                 const sortedFiles = files.sort((a, b) => b.createTime - a.createTime);
                 const filesToDelete = sortedFiles.slice(task.maxKeepSaveFile).map(file => ({ fileId: file.id, fileName: file.name, isFolder: 0 }));
@@ -707,8 +738,8 @@ class TaskService {
         }
     }
 
-    async cloudSignTask(cloud189, execThreshold=1, families=[]){
-        try{
+    async cloudSignTask(cloud189, execThreshold = 1, families = []) {
+        try {
             const signRlt = await cloud189.userSign(execThreshold);
             // 延迟10秒
             await new Promise(resolve => setTimeout(resolve, 10000));
@@ -717,7 +748,7 @@ class TaskService {
 
             // 确保this上下文正确
             await this.logTaskEvent.bind(this)(0, `签到完成, ${signRlt}, 家庭签到:${familySignRlt}`);
-            
+
             // 返回签到结果
             return `${signRlt}, ${familySignRlt}`;
         } catch (error) {

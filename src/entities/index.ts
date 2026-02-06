@@ -108,6 +108,8 @@ export class Task {
     @Column('text', { nullable: true })
     cronExpression?: string;
 
+    @Column({ default: 0 })
+    failCount!: number;
 
     @CreateDateColumn()
     createdAt!: Date;

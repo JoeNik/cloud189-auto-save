@@ -18,17 +18,17 @@ let editFolderSelector = new FolderSelector({
     }
 });
 
-function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex,episodeUseRegex,editeMaxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression) {
+function showEditTaskModal(id, targetFolderId, currentEpisodes, totalEpisodes, status, shareLink, accessCode, shareFolderId, shareFolderName, resourceName, targetFolderName, episodeThreshold, episodeRegex, episodeUseRegex, editeMaxKeepSaveFile, whitelistKeywords, blacklistKeywords, cronExpression) {
     document.getElementById('editTaskId').value = id;
     document.getElementById('editResourceName').value = resourceName;
-    document.getElementById('editTargetFolder').value = targetFolderName?targetFolderName:targetFolderId;
+    document.getElementById('editTargetFolder').value = targetFolderName ? targetFolderName : targetFolderId;
     document.getElementById('editTargetFolderId').value = targetFolderId;
     document.getElementById('editCurrentEpisodes').value = currentEpisodes;
     document.getElementById('editTotalEpisodes').value = totalEpisodes;
-    document.getElementById('editEpisodeThreshold').value = episodeThreshold || 1000;
+    document.getElementById('editEpisodeThreshold').value = (episodeThreshold !== undefined && episodeThreshold !== null) ? episodeThreshold : 1000;
     document.getElementById('editEpisodeRegex').value = episodeRegex || '';
     document.getElementById('editEpisodeUseRegex').checked = episodeUseRegex == 1;
-    document.getElementById('editeMaxKeepSaveFile').value = editeMaxKeepSaveFile || 100;
+    document.getElementById('editeMaxKeepSaveFile').value = (editeMaxKeepSaveFile !== undefined && editeMaxKeepSaveFile !== null) ? editeMaxKeepSaveFile : 100;
     document.getElementById('editWhitelistKeywords').value = whitelistKeywords || '';
     document.getElementById('editBlacklistKeywords').value = blacklistKeywords || '';
     document.getElementById('editStatus').value = status;
@@ -60,7 +60,7 @@ function initEditTaskForm() {
 
     document.getElementById('editTaskForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const id = document.getElementById('editTaskId').value;
         const resourceName = document.getElementById('editResourceName').value;
         const targetFolderId = document.getElementById('editTargetFolderId').value;
@@ -76,8 +76,8 @@ function initEditTaskForm() {
         const editeMaxKeepSaveFile = document.getElementById('editeMaxKeepSaveFile').value;
         const whitelistKeywords = document.getElementById('editWhitelistKeywords').value;
         const blacklistKeywords = document.getElementById('editBlacklistKeywords').value;
-        const cronExpression = document.getElementById('editCronExpression') ? 
-                              document.getElementById('editCronExpression').value : null;
+        const cronExpression = document.getElementById('editCronExpression') ?
+            document.getElementById('editCronExpression').value : null;
 
         try {
             const response = await fetch(`/api/tasks/${id}`, {
@@ -88,10 +88,10 @@ function initEditTaskForm() {
                     targetFolderId,
                     currentEpisodes: parseInt(currentEpisodes),
                     totalEpisodes: parseInt(totalEpisodes),
-                    episodeThreshold: episodeThreshold ? parseInt(episodeThreshold) : 1000,
+                    episodeThreshold: (episodeThreshold !== "" && episodeThreshold !== null) ? parseInt(episodeThreshold) : 1000,
                     episodeRegex: episodeRegex || null,
                     episodeUseRegex,
-                    maxKeepSaveFile: editeMaxKeepSaveFile? parseInt(editeMaxKeepSaveFile) : 100,
+                    maxKeepSaveFile: editeMaxKeepSaveFile ? parseInt(editeMaxKeepSaveFile) : 100,
                     whitelistKeywords: whitelistKeywords || null,
                     blacklistKeywords: blacklistKeywords || null,
                     status,
@@ -120,7 +120,7 @@ function initEditTaskForm() {
 async function loadShareFolders() {
     const taskId = document.getElementById('editTaskId').value;
     const accountId = document.getElementById('editAccountId').value;
-    
+
     if (!taskId || !accountId) {
         toast.error('任务ID或账号ID不存在');
         return;
@@ -129,18 +129,18 @@ async function loadShareFolders() {
     try {
         const response = await fetch(`/api/share/folders/${accountId}?taskId=${taskId}&folderId=-11`);
         const data = await response.json();
-        
+
         if (data.success) {
             const selectElement = document.getElementById('shareFolderOptions');
             selectElement.innerHTML = '';
-            
+
             data.data.forEach(folder => {
                 const option = document.createElement('option');
                 option.value = folder.id;
                 option.textContent = folder.name;
                 selectElement.appendChild(option);
             });
-            
+
             document.getElementById('shareFolderTreeContainer').style.display = 'block';
         } else {
             toast.error('加载文件夹列表失败');

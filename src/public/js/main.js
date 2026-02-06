@@ -463,7 +463,7 @@ async function loadTasks() {
                     <button onclick="showEditTaskModal(${task.id}, '${task.targetFolderId || ''}',
                     ${task.currentEpisodes || 0}, ${task.totalEpisodes || 0}, '${task.status}', 
                     '${task.shareLink}', '${task.accessCode}', '${task.shareFolderId || ''}', '${task.shareFolderName || ''}', '${task.resourceName}', 
-                    '${task.targetFolderName || ''}', ${task.episodeThreshold || 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex}, '${task.maxKeepSaveFile}','${task.whitelistKeywords || ''}', 
+                    '${task.targetFolderName || ''}', ${task.episodeThreshold !== undefined ? task.episodeThreshold : 1000}, '${task.episodeRegex || ''}', ${task.episodeUseRegex}, '${task.maxKeepSaveFile}','${task.whitelistKeywords || ''}', 
                     '${task.blacklistKeywords || ''}','${task.cronExpression || ''}', ${task.accountId})" class="btn btn-secondary mr-2">
                         <i class="fas fa-edit"></i>
                     </button>
